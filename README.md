@@ -3,6 +3,7 @@ ergo-subpooling is a smart contract based mining pool that allows groups of frie
 
 ## How to run
 To run, simply download the jar and run "java -jar ergo-subpooling.jar" in command line or terminal.
+https://github.com/K-Singh/ergo-subpooling/raw/master/out/artifacts/ergo_subpooling_jar/ergo-subpooling.jar
 
 ## Current Supported Mining Pools
 https://enigmapool.com
