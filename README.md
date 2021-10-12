@@ -1,1 +1,2 @@
-# appkit-by-example
+# ergo-subpooling
+ergo-subpooling is a smart contract based mining pool that allows groups of friends to pool together their hashrates in order to get mining pool rewards quicker than they would alone. The goal of this project is to help encourage decentralization of mining pools while also promoting small time miners who may not be able to get block rewards fast enough on normal mining pools. This project was developed for ERGOHACK II.
