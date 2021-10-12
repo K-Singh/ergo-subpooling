@@ -9,3 +9,6 @@ of the Ergo blockchain. If you own a mining pool and would like your pool to be 
 
 ### This project was made using Ergo-Appkit
 You can find it here: https://github.com/ergoplatform/ergo-appkit
+
+### This project was inspired by ErgoSmartPools
+https://github.com/WilfordGrimley/ErgoSmartPools
