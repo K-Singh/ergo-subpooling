@@ -12,7 +12,7 @@ smart contract protecting their funds. Each withdraw request contains informatio
 by each subpool member, along with the total share's submitted by the entire pool. When all members of the subpool have sent a withdraw request, the next phase begins.
 
 ## The Consensus Phase
-At this point, all member's have submitted their withdraw requests to the smart contract. Now, any member of the subpool may enter the 'distribute' command into their
+At this point, all member's have submitted their withdraw requests to the smart contract. Now, any member of the subpool may enter the ```distribute``` command into their
 subpooling program. At this point, the smart contract will take the average of each subpool state sent by each member and reach a consensus about the subpool's state.
 This consensus will then be used to figure out how much ERG each member of the subpool gets from the total payout. Members of the subpool are paid according to the proportion
 of shares they submitted to the subpool.
