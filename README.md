@@ -1,9 +1,50 @@
 # ergo-subpooling
 ergo-subpooling is a smart contract based mining pool that allows groups of friends to pool together their hashrates in order to get mining pool rewards quicker than they would alone. The goal of this dApp is to help encourage decentralization of mining pools while also promoting small time miners who may not be able to get block rewards fast enough on normal mining pools. This project was developed for ERGOHACK II.
 
-## How to run
+# How it works
+Subpooling allows for groups of friends to mine to the same address on a mining pool(Currently either Enigma Pool or HeroMiners). Any member of the subpool may enter the
+```create``` command and input all of the required information to make the subpool. At the end, they will get some text that they can paste into the ```parameters``` field of their ```subpool_config.json```. To ensure that everyone is mining to the correct subpool, each member of the subpool will copy and paste this same text into their own parameters field.
+The only field that members will have to change will be the ```workerName``` field.
+
+## The Holding Phase
+Once enough mining has been done, the mining pool will send a payout to the subpool. At this point, each member of the mining pool may send a withdraw request to the
+smart contract protecting their funds. Each withdraw request contains information about the subpool's state. This information consists of the number of share's submitted
+by each subpool member, along with the total share's submitted by the entire pool. When all members of the subpool have sent a withdraw request, the next phase begins.
+
+## The Consensus Phase
+At this point, all member's have submitted their withdraw requests to the smart contract. Now, any member of the subpool may enter the 'distribute' command into their
+subpooling program. At this point, the smart contract will take the average of each pool state sent by each subpool member and reach a consensus about the subpool's state.
+This consensus will then be used to figure out how much ERG each member of the subpool gets from the total payout. Members of the subpool are paid according to the proportion
+of shares they submitted to the subpool.
+
+## An Example
+Alice and Bob are both mining to Herominers and decide to make a subpool. They go through the program instructions and then mine to the subpool for a few days until they get their payout of 0.5 ERG. Alice decides to send a withdraw request first, she enters the withdraw command which pings Herominers for information about the subpool. Herominers then sends the information back to Alice's subpooling program. The information consists of 3 things: Alice's share number, Bob's share number, and the total Share number. 
+
+Lets say during Alice's withdraw request, the information she got was:
+
+```[50, 25, 75]```
+
+A day later Bob sends his withdraw request, which has this information from the mining pool: 
+
+```[100, 50, 150]```
+
+Now that both Bob and Alice have sent withdraw requests, either Bob or Alice can enter the distribute command. Bob sends this command to the smart contract which takes the average from both withdraw requests and comes to a consensus about how many shares Alice or Bob sent. In this case the consensus will look like this:
+
+```[75, 37.5, 112.5]```
+
+From this consensus, the smart contract will determine how much ERG each member of the subpool will get. In this case, Alice will get:
+
+```(75 / 112.5) * (0.5 - (MinTxFee / 2)) = ~0.32```
+
+While Bob will get:
+
+```(37.5 / 112.5) * (0.5 - (MinTxFee / 2)) = ~0.16```
+
+The transaction fee is split up evenly between each member of the subpool.
+
+# How to run
 To run, simply download the jar and run 
-```java -jar ergo-subpooling-0.1.jar``` 
+```java -jar ergo-subpooling-0.2.jar``` 
 in command line or terminal.
 ### [Download Here](https://github.com/K-Singh/ergo-subpooling/raw/master/ergo-subpooling-0.2.jar)
 If it says you need a subpool_config.json file, look at the one given [here](https://github.com/K-Singh/ergo-subpooling/blob/309a5e7d957a5455a8856d4ef251ab80c757b1d9/subpool_config.json) in the repository as an example.
@@ -16,7 +57,7 @@ sbt assembly
 In this way you can get around running a precompiled jar.
 
 
-## Current Supported Mining Pools
+# Current Supported Mining Pools
 https://enigmapool.com
 
 https://ergo.herominers.com/
@@ -24,8 +65,8 @@ https://ergo.herominers.com/
 ergo-subpooling only supports two mining pools at the moment. The goal is to incorporate as many mining pools as possible, especially smaller ones so as to increase security
 of the Ergo blockchain. If you own a mining pool and would like your pool to be supported, please message me or send a pull request.
 
-### This project was made using Ergo-Appkit
+## This project was made using Ergo-Appkit
 You can find it here: https://github.com/ergoplatform/ergo-appkit
 
-### This project was inspired by ErgoSmartPools
+## This project was inspired by ErgoSmartPools
 https://github.com/WilfordGrimley/ErgoSmartPools
