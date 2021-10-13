@@ -12,6 +12,7 @@ object SubPoolingApp {
   def main(args: Array[String]): Unit = {
 
     // Node configuration values
+    //TODO Make sure to change back to subpool_config.json
     val conf: SubPoolConfig = SubPoolConfig.load("subpool_config.json")
     val nodeConf: ErgoNodeConfig = conf.getNode
     val explorerUrl: String = RestApiErgoClient.getDefaultExplorerUrl(conf.getNode.getNetworkType)

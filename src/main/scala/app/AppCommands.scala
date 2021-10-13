@@ -7,6 +7,7 @@ import contracts.HoldingStageHelpers.generateHoldingOutputRegisterList
 import contracts.{ConsensusStageHelpers, HoldingStageHelpers}
 import okhttp3.{OkHttpClient, Request}
 import org.ergoplatform.appkit.{Address, ErgoClient, ErgoContract, ErgoProver, ErgoToken, InputBox, NetworkType, OutBox, Parameters, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
+import pools.{EnigmaPoolRequests, HeroMinersRequests}
 import test.SubPool_Test_2_Miners.{consensusValue, miner1Address, workerName1}
 
 import scala.:+
@@ -129,16 +130,26 @@ object AppCommands {
   def withdraw(ergoClient: ErgoClient, config: configs.SubPoolConfig) = {
     var workerShareList = Array.empty[Long]
     var totalShares = 0L
-
-    // Add options for different pool requests later
+    println("Please enter the mining pool that your subpool currently mines to.")
+    println("Enter \"enigma\" for Enigma Pool or \"hero\" for HeroMiners:")
+    val poolName = scala.io.StdIn.readLine()
     try {
-      val httpReq = requestFromEnigmaPool(config)
-      workerShareList = httpReq._1
-      totalShares = httpReq._2
+      poolName match {
+        case "enigma" =>
+          val httpReq = requestFromEnigmaPool(config)
+          workerShareList = httpReq._1
+          totalShares = httpReq._2
+        case "hero" =>
+          val httpReq = requestFromHeroMiners(config)
+          workerShareList = httpReq._1
+          totalShares = httpReq._2
+        case _ => println("The pool name given is not valid!")
+          sys.exit(0)
+      }
     }catch {
-      case err:ArrayIndexOutOfBoundsException => println("There was an error accessing information from your mining pool! Are your worker names correct?")
-        sys.exit(1)
       case err:Throwable => println("There was an unknown error while accessing information from your mining pool!")
+        println(" ErrorVal: " + err.getMessage)
+        println(" StackTrace: " + err.printStackTrace())
         sys.exit(1)
     }
 
@@ -218,32 +229,68 @@ object AppCommands {
     })
   }
 
-  // Send Get Request To Enigma Pool, format responses into useable values
-  def requestFromEnigmaPool(config: SubPoolConfig) = {
-
+  // Send Request To Enigma Pool, format responses into useable values
+  def requestFromEnigmaPool(config: SubPoolConfig): (Array[Long], Long) = {
+    val gson = new GsonBuilder().create()
     val addrStr = config.getParameters.getHoldingAddress
     val httpClient = new OkHttpClient()
 
     val reqTotalShares = new Request.Builder().url(s"https://api.enigmapool.com/shares/${addrStr}").build()
     val respTotalShares = httpClient.newCall(reqTotalShares).execute()
     val respString1 = respTotalShares.body().string()
-    //println(respString1)
-    val totalShares = respString1.split(":")(2).split(",")(0).toLong
 
+    val sharesReqObject = gson.fromJson(respString1, classOf[EnigmaPoolRequests.SharesRequest])
+    val totalShares = sharesReqObject.shares.valid.toLong
 
     val reqWorkerShares = new Request.Builder().url(s"https://api.enigmapool.com/workers/${addrStr}").build()
     val respWorkerShares = httpClient.newCall(reqWorkerShares).execute()
     val respString2 = respWorkerShares.body().string()
-    //println(respString2)
+
+    val workerReqObject = gson.fromJson(respString2, classOf[EnigmaPoolRequests.WorkerRequest])
     def getWorkerShareNumber(workerName: String) = {
-      val searchString = workerName + "\",\"shares\":"
-      val startingIdx = respString2.indexOf(searchString) + searchString.length
-      val slicedStr = respString2.substring(startingIdx).split(",")(0).split("}")(0)
-      slicedStr.toLong
+      val worker = workerReqObject.workers.toList.find{(w: EnigmaPoolRequests.Worker) => w.worker == workerName}
+      if(worker.isDefined){
+        worker.get.shares.toLong
+      }else{
+        println(s"Error: Worker ${workerName} could not be found!")
+        sys.exit(0)
+      }
     }
     //val workerShareList = getWorkerShareNumber("testWorker")
     val workerShareList = config.getParameters.getWorkerList.map(getWorkerShareNumber)
-    println(totalShares)
+    //println(totalShares)
+    //workerShareList.foreach(println)
+    // println(workerShareList.mkString("Array(", ", ", ")"))
+    (workerShareList, totalShares)
+  }
+
+  def requestFromHeroMiners(config: SubPoolConfig): (Array[Long], Long) ={
+    val gson = new GsonBuilder().create()
+    val addrStr = config.getParameters.getHoldingAddress
+
+    val httpClient = new OkHttpClient()
+
+    val reqPoolState = new Request.Builder().url(s"https://ergo.herominers.com/api/stats_address?address=${addrStr}").build()
+    val respPoolState = httpClient.newCall(reqPoolState).execute()
+    val respString = respPoolState.body().string()
+    //println(respString)
+
+
+    val poolStateObject = gson.fromJson(respString, classOf[HeroMinersRequests.PoolState])
+    val totalShares = poolStateObject.stats.shares_good
+    def getWorkerShareNumber(workerName: String) = {
+      val worker = poolStateObject.workers.toList.find{(w: HeroMinersRequests.Worker) => w.name == workerName}
+      if(worker.isDefined){
+        worker.get.shares_good
+      }else{
+        println(s"Error: Worker ${workerName} could not be found!")
+        sys.exit(0)
+      }
+    }
+    //val workerShareList = getWorkerShareNumber("testWorker")
+    val workerShareList = config.getParameters.getWorkerList.map(getWorkerShareNumber)
+    //println(totalShares)
+    //workerShareList.foreach(println)
     // println(workerShareList.mkString("Array(", ", ", ")"))
     (workerShareList, totalShares)
   }
