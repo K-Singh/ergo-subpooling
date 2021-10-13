@@ -92,7 +92,7 @@ object AppCommands {
       val parameters = new SubPoolParameters(workerName, addressList.toArray, workerList.toArray , holdingAddress.toString, consensusAddress.toString, minPayout)
       println("\n\n")
       println(gson.toJson(parameters))
-      println("Please copy the above into your config file. The curly brackets should start next to the parameters field.")
+      println("\nPlease copy the above into your config file. The curly brackets should start next to the parameters field.")
       println("All miners in your subpool should also copy this while making sure to change their worker name.\n")
       println("")
       println("You have finished creating your subpool! Press enter to exit the program.")
