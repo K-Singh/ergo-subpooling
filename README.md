@@ -13,7 +13,7 @@ by each subpool member, along with the total share's submitted by the entire poo
 
 ## The Consensus Phase
 At this point, all member's have submitted their withdraw requests to the smart contract. Now, any member of the subpool may enter the 'distribute' command into their
-subpooling program. At this point, the smart contract will take the average of each pool state sent by each subpool member and reach a consensus about the subpool's state.
+subpooling program. At this point, the smart contract will take the average of each subpool state sent by each member and reach a consensus about the subpool's state.
 This consensus will then be used to figure out how much ERG each member of the subpool gets from the total payout. Members of the subpool are paid according to the proportion
 of shares they submitted to the subpool.
 
