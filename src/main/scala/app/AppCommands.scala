@@ -53,7 +53,7 @@ object AppCommands {
         str match {
           case "exit" => sys.exit(0)
           case elem:String => addressList.append(elem).toString
-          case _: String =>
+
         }
       }
     println("Now enter the worker names that correspond to each address in the order that they were given. Enter \"done\" when complete.")
@@ -63,17 +63,25 @@ object AppCommands {
         str match {
           case "exit" => sys.exit(0)
           case elem:String => workerList.append(elem).toString
-          case _: String =>
+
         }
       }
 
     println("Please re-enter YOUR own worker name. Other members of your pool will enter their worker names into their own config.")
     println("Duplicate worker names will cause issues so make sure that all members of your pool input their names correctly!")
     val workerName = scala.io.StdIn.readLine()
-    val minerAddresses = addressList.map{(s: String) => Address.create(s)}
+    var minerAddresses = ListBuffer.empty[Address]
+    try{
+    minerAddresses = addressList.map{(s: String) => Address.create(s)}
+    }catch {
+        case err: Throwable => println("The addresses given were not valid!")
+        sys.exit(0)
+      }
+
+
     println("Finally, enter your mining pool's minimum payout in ERG: ")
     val minPayout: Double = scala.io.StdIn.readDouble()
-    System.out.println(addressList)
+
     client.execute(ctx => {
       val holdingContract = HoldingStageHelpers.generateHoldingContract(ctx, minerAddresses.toList, (minPayout * Parameters.OneErg).toLong)
       val consensusContract = ConsensusStageHelpers.generateConsensusContract(ctx, minerAddresses.toList, (minPayout * Parameters.OneErg).toLong)
@@ -119,10 +127,20 @@ object AppCommands {
   }
 
   def withdraw(ergoClient: ErgoClient, config: configs.SubPoolConfig) = {
+    var workerShareList = Array.empty[Long]
+    var totalShares = 0L
+
     // Add options for different pool requests later
-    val httpReq = requestFromEnigmaPool(config)
-    val workerShareList = httpReq._1
-    val totalShares = httpReq._2
+    try {
+      val httpReq = requestFromEnigmaPool(config)
+      workerShareList = httpReq._1
+      totalShares = httpReq._2
+    }catch {
+      case err:ArrayIndexOutOfBoundsException => println("There was an error accessing information from your mining pool! Are your worker names correct?")
+        sys.exit(1)
+      case err:Throwable => println("There was an unknown error while accessing information from your mining pool!")
+        sys.exit(1)
+    }
 
     ergoClient.execute(ctx => {
       val prover: ErgoProver = ctx.newProverBuilder

@@ -16,3 +16,4 @@ resolvers ++= Seq(
 
 assemblyJarName in assembly := s"ergo-subpooling-${version.value}.jar"
 mainClass in assembly := Some("app.SubPoolingApp")
+assemblyOutputPath in assembly := file(s"./ergo-subpooling-${version.value}.jar/")
