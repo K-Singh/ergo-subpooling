@@ -18,9 +18,10 @@ In this way you can get around running a precompiled jar.
 
 ## Current Supported Mining Pools
 https://enigmapool.com
+
 https://ergo.herominers.com/
 
-ergo-subpooling only supports one mining pool at the moment. The goal is to incorporate as many mining pools as possible, especially smaller ones so as to increase security
+ergo-subpooling only supports two mining pools at the moment. The goal is to incorporate as many mining pools as possible, especially smaller ones so as to increase security
 of the Ergo blockchain. If you own a mining pool and would like your pool to be supported, please message me or send a pull request.
 
 ### This project was made using Ergo-Appkit
