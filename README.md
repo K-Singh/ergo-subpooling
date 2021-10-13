@@ -18,7 +18,7 @@ This consensus will then be used to figure out how much ERG each member of the s
 of shares they submitted to the subpool.
 
 ## An Example
-Alice and Bob are both mining to Herominers and decide to make a subpool. They go through the program instructions and then mine to the subpool for a few days until they get their payout of 0.5 ERG. Alice decides to send a withdraw request first, she enters the withdraw command which pings Herominers for information about the subpool. Herominers then sends the information back to Alice's subpooling program. The information consists of 3 things: Alice's share number, Bob's share number, and the total Share number. 
+Alice and Bob are both mining to Herominers and decide to make a subpool. They go through the program instructions and then mine to the subpool for a few days until they get their payout of 0.5 ERG. Alice decides to send a withdraw request first, she enters the withdraw command which pings Herominers for information about the subpool. Herominers then sends the information back to Alice's subpooling program. This information is then sent to the smart contract protecting Alice and Bob's funds. The information consists of 3 things: Alice's share number, Bob's share number, and the total Share number. 
 
 Lets say during Alice's withdraw request, the information she got was:
 
