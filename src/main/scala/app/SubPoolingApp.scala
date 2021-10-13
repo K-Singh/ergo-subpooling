@@ -22,7 +22,7 @@ object SubPoolingApp {
 
     println("This is the Ergo Subpooling dApp. Please enter \"create\" to make a new subpool or \"load\" to load from config file.")
     println("Enter \"help\" for more information:")
-    println("WARNING: Subpooling can currently only hook into enigmapool.com! Please ensure you are mining to this pool.")
+    println("WARNING: Subpooling can currently only hook into enigmapool.com and ergo.herominers.com! Please ensure you are mining to one of these pools.")
     println("More mining pools are planned to be added in the future.")
     Iterator.continually(scala.io.StdIn.readLine)
       .takeWhile(_ != "exit")
