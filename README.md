@@ -24,7 +24,7 @@ Lets say during Alice's withdraw request, the information she got was:
 
 ```[50, 25, 75]```
 
-A day later Bob sends his withdraw request, which has this information from the mining pool: 
+A day later, Bob sends his withdraw request which has this information from the mining pool: 
 
 ```[100, 50, 150]```
 
