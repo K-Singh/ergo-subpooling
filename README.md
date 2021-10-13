@@ -1,7 +1,7 @@
 # ergo-subpooling
 ergo-subpooling is a smart contract based mining pool that allows groups of friends to pool together their hashrates in order to get mining pool rewards quicker than they would alone. Subpooling allows members to mine to the same address without worrying about one person controlling the funds. The goal of this dApp is to help encourage decentralization of mining pools while also promoting small time miners who may not be able to get block rewards fast enough on normal mining pools. This project was developed for ERGOHACK II.
 
-# How it works
+# How It Works
 Subpooling allows for groups of friends to mine to the same address on a mining pool(Currently either Enigma Pool or HeroMiners). Any member of the subpool may enter the
 ```create``` command and input all of the required information to make the subpool. At the end, they will get some text that they can paste into the ```parameters``` field of their ```subpool_config.json```. To ensure that everyone is mining to the correct subpool, each member of the subpool will copy and paste this same text into their own parameters field.
 The only field that members will have to change will be the ```workerName``` field.
@@ -42,7 +42,7 @@ While Bob will get:
 
 The transaction fee is split up evenly between each member of the subpool.
 
-# How to run
+# How To Run
 To run, simply download the jar and run 
 ```java -jar ergo-subpooling-0.2.jar``` 
 in command line or terminal.
