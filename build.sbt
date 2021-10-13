@@ -1,4 +1,4 @@
-name := "appkit-by-example"
+name := "ergo-subpooling"
 
 version := "0.1"
 
@@ -13,3 +13,6 @@ resolvers ++= Seq(
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 )
+
+assemblyJarName in assembly := s"ergo-subpooling-${version.value}.jar"
+mainClass in assembly := Some("app.SubPoolingApp")
