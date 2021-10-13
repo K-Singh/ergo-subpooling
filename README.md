@@ -8,6 +8,7 @@ If it says you need a subpool_config.json file, look at the one given [here](htt
 
 Alternatively, you may clone the repository and run: 
 ```
+cd ergo-subpooling
 sbt assembly
 ```
 In this way you can get around running a precompiled jar.
