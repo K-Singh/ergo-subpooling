@@ -28,7 +28,7 @@ A day later Bob sends his withdraw request, which has this information from the 
 
 ```[100, 50, 150]```
 
-Now that both Bob and Alice have sent withdraw requests, either Bob or Alice can enter the distribute command. Bob sends this command to the smart contract which takes the average from both withdraw requests and comes to a consensus about how many shares Alice or Bob sent. In this case the consensus will look like this:
+Now that both Bob and Alice have sent withdraw requests, either Bob or Alice can enter the ```distribute``` command. Bob sends this command to the smart contract which takes the average from both withdraw requests and comes to a consensus about how many shares Alice or Bob sent. In this case the consensus will look like this:
 
 ```[75, 37.5, 112.5]```
 
