@@ -14,13 +14,17 @@ import java.nio.file.Paths;
  * Based off ErgoToolConfig
  * */
 public class SubPoolConfig {
-    private ErgoNodeConfig node;
+    private SubPoolNodeConfig node;
     private SubPoolParameters parameters;
 
+    public SubPoolConfig(SubPoolNodeConfig nodeConf, SubPoolParameters paramConf){
+        node = nodeConf;
+        parameters = paramConf;
+    }
     /**
      * Returns Ergo node configuration
      */
-    public ErgoNodeConfig getNode() {
+    public SubPoolNodeConfig getNode() {
         return node;
     }
 

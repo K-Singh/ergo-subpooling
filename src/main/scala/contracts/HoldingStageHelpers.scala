@@ -12,22 +12,24 @@ object HoldingStageHelpers {
   def getHoldingScript(scriptVar: String): String = {
     val script: String = s"""
        {
-       val R4Defined = OUTPUTS(0).R4[Coll[(SigmaProp, Long)]].isDefined
-       val R5Defined = OUTPUTS(0).R5[Long].isDefined
-       val R6Defined = OUTPUTS(0).R6[SigmaProp].isDefined
-       val R7Defined = OUTPUTS(0).R7[Coll[Byte]].isDefined
+       val RegsDefined = allOf(Coll(
+       OUTPUTS(0).R4[Coll[(SigmaProp, Long)]].isDefined,
+       OUTPUTS(0).R5[Long].isDefined,
+       OUTPUTS(0).R6[SigmaProp].isDefined,
+       OUTPUTS(0).R7[Coll[Byte]].isDefined
+       ))
        val MinerPKs = Coll(${scriptVar})
-
+       val consensusBytes = consensusPropBytes
        def areAllKeysInPoolState(pk: SigmaProp):Boolean = OUTPUTS(0).R4[Coll[(SigmaProp, Long)]].get.exists{(poolStateVal: (SigmaProp, Long)) => poolStateVal._1 == pk}
 
-       val isPoolStateValid = R4Defined && MinerPKs.forall(areAllKeysInPoolState)
-       val isTotalSharesValid = R5Defined && R4Defined && OUTPUTS(0).R4[Coll[(SigmaProp, Long)]].get.fold(0L, {(accum:Long, poolStateVal: (SigmaProp, Long)) => accum + poolStateVal._2}) == OUTPUTS(0).R5[Long].get
+       val isPoolStateValid = RegsDefined && MinerPKs.forall(areAllKeysInPoolState)
+       val isTotalSharesValid = RegsDefined && OUTPUTS(0).R4[Coll[(SigmaProp, Long)]].get.fold(0L, {(accum:Long, poolStateVal: (SigmaProp, Long)) => accum + poolStateVal._2}) == OUTPUTS(0).R5[Long].get
 
-       val isSignatureValid = sigmaProp(R6Defined) && MinerPKs.filter{(pk: SigmaProp) => pk == OUTPUTS(0).R6[SigmaProp].get}(0)
+       val isSignatureValid = sigmaProp(RegsDefined) && MinerPKs.filter{(pk: SigmaProp) => pk == OUTPUTS(0).R6[SigmaProp].get}(0)
 
        val doesOutputReDeposit = OUTPUTS.size == 3 && OUTPUTS.exists{(box: Box) => box.propositionBytes == SELF.propositionBytes}
        val isSignerInMinerList = atLeast(1, MinerPKs)
-       val isOutput1ValueValid = OUTPUTS.exists{(box: Box) => box.value == sentConsensusValue - minFee}
+       val isOutput1ValueValid = OUTPUTS(0).value == (sentConsensusValue - minFee) && OUTPUTS(0).propositionBytes == consensusBytes
        val isRedepositNeeded = if(SELF.value >= sentConsensusValue*2){doesOutputReDeposit}else{true}
 
        (isSignerInMinerList && isSignatureValid && (sigmaProp(isPoolStateValid && isTotalSharesValid && isRedepositNeeded)))
@@ -36,7 +38,7 @@ object HoldingStageHelpers {
     script
   }
   // Include workerTupleMap
-  def generateHoldingContract(ctx: BlockchainContext, minerList: List[Address], miningPoolPayout: Long): ErgoContract = {
+  def generateHoldingContract(ctx: BlockchainContext, minerList: List[Address], miningPoolPayout: Long, consensusAddress: Address): ErgoContract = {
     val publicKeyList = (minerList.map{(addr: Address) => addr.getPublicKey})
     val consensusVal = miningPoolPayout / minerList.size
 
@@ -52,10 +54,11 @@ object HoldingStageHelpers {
       numMiners += 1
     }
     publicKeyList.drop(1).foreach{(dlog: ProveDlog) => buildMinerConstants(dlog)}
-    System.out.println(scriptVarString)
+    //System.out.println(scriptVarString)
     val compiledContract = ctx.compileContract(constantsBuilder
       .item("sentConsensusValue", consensusVal)
       .item("minFee", Parameters.MinFee)
+      .item("consensusPropBytes", consensusAddress.getErgoAddress.contentBytes)
       .build(), getHoldingScript(scriptVarString))
     compiledContract
   }

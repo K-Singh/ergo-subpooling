@@ -5,7 +5,7 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.appkit.JavaHelpers.SigmaDsl
 import org.ergoplatform.appkit.{ErgoType, _}
 import config.ErgoNodeConfig
-import configs.SubPoolConfig
+import configs.{SubPoolConfig, SubPoolNodeConfig}
 import SubPoolConfig._
 import org.ergoplatform.appkit.impl.ErgoNodeFacade
 import retrofit2.converter.gson.GsonConverterFactory
@@ -56,9 +56,11 @@ object SubPool_Test_2_Miners {
     val poolProver: ErgoProver = ctx.newProverBuilder.withMnemonic(miningPool, SecretString.create("")).withEip3Secret(0).build()
     // Get input boxes of mining pool
     val tokenList = List.empty[ErgoToken].asJava
-    val miningPoolBoxes: java.util.List[InputBox] = ctx.getCoveringBoxesFor(miningPoolAddress, poolSendingValue + Parameters.MinFee, tokenList).getBoxes
+    val miningPoolBoxes: java.util.List[InputBox] = ctx.getCoveringBoxesFor(miningPoolAddress, consensusValue + Parameters.MinFee, tokenList).getBoxes
     // Protection contract for holding box
-    val holdingContract = generateHoldingContract(ctx, minerAddressList, holdingContractConstant)
+    val consensusContract = generateConsensusContract(ctx, minerAddressList, consensusValue)
+    val consensusAddress = generateContractAddress(consensusContract, NetworkType.TESTNET)
+    val holdingContract = generateHoldingContract(ctx, minerAddressList, holdingContractConstant, consensusAddress)
     //System.out.print(holdingContract)
     // Create address for holding box, important so that change can be sent back to box.
     val holdingAddress = contracts.generateContractAddress(holdingContract, NetworkType.TESTNET)
@@ -95,14 +97,15 @@ object SubPool_Test_2_Miners {
 
 
     val amountToSend: Long = consensusValue - (Parameters.MinFee)
-
-    val holdingContract = generateHoldingContract(ctx, minerAddressList, holdingContractConstant)
+    // Protection contract for consensus box
+    val consensusContract = generateConsensusContract(ctx, minerAddressList, consensusValue)
+    val consensusAddress = generateContractAddress(consensusContract, NetworkType.TESTNET)
+    val holdingContract = generateHoldingContract(ctx, minerAddressList, holdingContractConstant, consensusAddress)
     // Create address for holding box, important so that change can be sent back to box.
     val holdingAddress = contracts.generateContractAddress(holdingContract, NetworkType.TESTNET)
     System.out.println(holdingAddress)
 
-    // Protection contract for consensus box
-    val consensusContract = generateConsensusContract(ctx, minerAddressList, consensusValue)
+
     // Create unsigned transaction builder
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val txB2: UnsignedTransactionBuilder = ctx.newTxBuilder
@@ -141,13 +144,14 @@ object SubPool_Test_2_Miners {
       .boxesToSpend(holdingBoxList)
       .outputs(holdingOutBox2)
       .fee(Parameters.MinFee)
+
       .sendChangeTo(holdingAddress.getErgoAddress)
       .build()
 
     txB.getInputBoxes.forEach(x => System.out.println("Hi! \n" + x.toJson(true)))
     // Sign transaction of mining pool to holding box
-    val signed: SignedTransaction = miner1Prover.sign(tx)
-    //val signed: SignedTransaction = miner2Prover.sign(tx2)
+    //val signed: SignedTransaction = miner1Prover.sign(tx)
+    val signed: SignedTransaction = miner2Prover.sign(tx2)
     // Submit transaction to node
     val txId: String = ctx.sendTransaction(signed)
 
@@ -208,18 +212,19 @@ object SubPool_Test_2_Miners {
   def main(args: Array[String]): Unit = {
 
     // Node configuration values
-    val conf: SubPoolConfig = SubPoolConfig.load("subpool_config.json")
-    val nodeConf: ErgoNodeConfig = conf.getNode
+    val conf: SubPoolConfig = SubPoolConfig.load("test_config.json")
+
+    val nodeConf: SubPoolNodeConfig = conf.getNode
     val explorerUrl: String = RestApiErgoClient.getDefaultExplorerUrl(NetworkType.TESTNET)
 
     // Create ErgoClient instance (represents connection to node)
-    val ergoClient: ErgoClient = RestApiErgoClient.create(nodeConf, explorerUrl)
+    val ergoClient: ErgoClient = RestApiErgoClient.create(nodeConf.getNodeApi.getApiUrl, nodeConf.getNetworkType, nodeConf.getNodeApi.getApiKey, explorerUrl)
 
     // Execute transaction
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
-      //miningPoolToHoldingBoxTx(ctx, miningPoolString, miner1String, miner2String)
+      miningPoolToHoldingBoxTx(ctx, miningPoolString, miner1String, miner2String)
       //holdingBoxToConsensusTx(ctx, miner1String, miner2String)
-      consensusToMinersTx(ctx, miner1String, miner2String)
+      //consensusToMinersTx(ctx, miner1String, miner2String)
     })
       //val txJson: String = sendTx("subpool_config.json")
       System.out.println(txJson)

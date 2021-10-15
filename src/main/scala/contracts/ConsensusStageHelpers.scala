@@ -52,7 +52,7 @@ object ConsensusStageHelpers {
 
        val doOutputsFollowConsensus = MinerPKs.forall{
        (pk: SigmaProp) => OUTPUTS.exists{
-        (box: Box) => getSharesFromConsensus(pk) == box.value
+        (box: Box) => getSharesFromConsensus(pk) == box.value && box.propositionBytes == pk.propBytes
           }
         }
 
@@ -83,7 +83,7 @@ object ConsensusStageHelpers {
     }
 
     publicKeyList.drop(1).foreach{(dlog: ProveDlog) => buildMinerConstants(dlog)}
-    System.out.println(scriptVarString)
+    //System.out.println(scriptVarString)
     val compiledContract = ctx.compileContract(constantsBuilder
       .item("minFee", Parameters.MinFee)
 
@@ -124,7 +124,7 @@ object ConsensusStageHelpers {
         (poolStateVal: (SigmaProp, Long)) => poolStateVal._1 == genSigProp(addr)
       }.head._2)
     }
-    println(addressToBoxValueList)
+    //println(addressToBoxValueList)
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val outBoxList: ListBuffer[OutBox] = ListBuffer.empty[OutBox]
     addressToBoxValueList.foreach{(addrToBoxVal: (Address, Long)) =>
@@ -133,7 +133,7 @@ object ConsensusStageHelpers {
   outBoxList
   }
 
-  def findValidInputBoxes(ctx: BlockchainContext, minerList: List[Address], inputBoxes:List[InputBox]) = {
+  def findValidInputBoxes(ctx: BlockchainContext, minerList: List[Address], inputBoxes:List[InputBox]): List[InputBox] = {
     minerList.map{(addr: Address) => inputBoxes.filter {
       (box: InputBox) => genSigProp(addr) == box.getRegisters.get(2).getValue.asInstanceOf[SigmaProp]}.head
     }

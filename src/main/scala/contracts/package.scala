@@ -1,3 +1,4 @@
+import org.ergoplatform.{ErgoAddressEncoder, Pay2SHAddress}
 import org.ergoplatform.appkit.{Address, ErgoContract, NetworkType}
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.eval.CostingSigmaDslBuilder.proveDlog
