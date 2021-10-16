@@ -74,7 +74,6 @@ object HoldingStageHelpers {
     val ergoVal2 = ErgoValue.of(totalShares)
     val ergoVal3 = ErgoValue.of(signerAddress.getPublicKey)
     val ergoVal4 = ErgoValue.of(Blake2b256(workerName))
-   
     List(ergoVal1, ergoVal2, ergoVal3, ergoVal4)
   }
 

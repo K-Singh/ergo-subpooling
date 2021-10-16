@@ -7,7 +7,7 @@ import contracts.HoldingStageHelpers.generateHoldingOutputRegisterList
 import contracts.{ConsensusStageHelpers, HoldingStageHelpers}
 import okhttp3.{OkHttpClient, Request}
 import org.ergoplatform.appkit.config.ErgoNodeConfig
-import org.ergoplatform.appkit.{Address, ErgoClient, ErgoContract, ErgoProver, ErgoToken, InputBox, NetworkType, OutBox, Parameters, RestApiErgoClient, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
+import org.ergoplatform.appkit.{Address, ErgoClient, ErgoContract, ErgoProver, ErgoToken, ErgoValue, InputBox, Mnemonic, NetworkType, OutBox, Parameters, RestApiErgoClient, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
 import pools.{EnigmaPoolRequests, HeroMinersRequests}
 import test.SubPool_Test_2_Miners.{consensusValue, miner1Address, workerName1}
 
@@ -172,23 +172,36 @@ object AppCommands {
         .withMnemonic(
           SecretString.create(config.getNode.getWallet.getMnemonic),
           SecretString.create(config.getNode.getWallet.getPassword))
+        .withEip3Secret(0)
         .build()
+
+
+
+      var provingAddress = prover.getAddress
       val holdingAddress = Address.create(config.getParameters.getHoldingAddress)
       val consensusAddress = Address.create(config.getParameters.getConsensusAddress)
       val minerAddressList = config.getParameters.getMinerAddressList.map(Address.create)
-      val consensusAmnt: Long = ((config.getParameters.getMinimumPayout*Parameters.OneErg)/minerAddressList.size).toLong
+      val consensusAmnt: Long = ((config.getParameters.getMinimumPayout*Parameters.OneErg)/minerAddressList.size).toLong - Parameters.MinFee
 
+      val filterList: Array[Address] = minerAddressList.filter{(addr: Address) => prover.getEip3Addresses.asScala.exists{(eip: Address) => eip.toString == addr.toString}}
+        if (filterList.length > 0) {
+          provingAddress = filterList(0)
+        } else {
+          println("The secret string provided was unable to verify you as a member of the subpool!")
+          sys.exit(0)
+        }
 
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
       val tokenList = List.empty[ErgoToken].asJava
       val holdingBoxList: java.util.List[InputBox] = ctx.getCoveringBoxesFor(holdingAddress, consensusAmnt + Parameters.MinFee, tokenList).getBoxes
-      val registerList = generateHoldingOutputRegisterList(minerAddressList.toList, workerShareList.toList, totalShares, prover.getAddress, config.getParameters.getWorkerName)
+      val registerList = generateHoldingOutputRegisterList(minerAddressList.toList, workerShareList.toList, totalShares, provingAddress, config.getParameters.getWorkerName)
 
       val holdingOutBox: OutBox = txB.outBoxBuilder
         .value(consensusAmnt)
         .contract(ctx.newContract(consensusAddress.getErgoAddress.script))
         .registers(registerList: _*)
         .build()
+
 
       val tx: UnsignedTransaction = txB
         .boxesToSpend(holdingBoxList)
@@ -198,6 +211,7 @@ object AppCommands {
         .build()
       val signed: SignedTransaction = prover.sign(tx)
       val txId: String = ctx.sendTransaction(signed)
+      println(s"Your withdrawal request was successful! Your transaction id is: ${txId}")
     })
   }
 
