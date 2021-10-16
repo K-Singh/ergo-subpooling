@@ -175,8 +175,6 @@ object AppCommands {
         .withEip3Secret(0)
         .build()
 
-
-
       var provingAddress = prover.getAddress
       val holdingAddress = Address.create(config.getParameters.getHoldingAddress)
       val consensusAddress = Address.create(config.getParameters.getConsensusAddress)
@@ -222,6 +220,7 @@ object AppCommands {
         .withMnemonic(
           SecretString.create(config.getNode.getWallet.getMnemonic),
           SecretString.create(config.getNode.getWallet.getPassword))
+        .withEip3Secret(0)
         .build()
 
       val minerAddressList = config.getParameters.getMinerAddressList.map(Address.create)
@@ -254,6 +253,7 @@ object AppCommands {
       // Sign transaction of mining pool to holding box
       val signed: SignedTransaction = prover.sign(tx)
       val txId: String = ctx.sendTransaction(signed)
+      println(s"Your distribution transaction was successful! Your transaction id is: ${txId}")
     })
   }
 
@@ -295,7 +295,6 @@ object AppCommands {
   def requestFromHeroMiners(config: SubPoolConfig): (Array[Long], Long) ={
     val gson = new GsonBuilder().create()
     val addrStr = config.getParameters.getHoldingAddress
-
     val httpClient = new OkHttpClient()
 
     val reqPoolState = new Request.Builder().url(s"https://ergo.herominers.com/api/stats_address?address=${addrStr}").build()
@@ -303,7 +302,7 @@ object AppCommands {
     val respString = respPoolState.body().string()
     //println(respString)
     val poolStateObject = gson.fromJson(respString, classOf[HeroMinersRequests.PoolState])
-    val totalShares = poolStateObject.stats.shares_good
+
     def getWorkerShareNumber(workerName: String) = {
       val worker = poolStateObject.workers.toList.find{(w: HeroMinersRequests.Worker) => w.name == workerName}
       if(worker.isDefined){
@@ -313,8 +312,9 @@ object AppCommands {
         sys.exit(0)
       }
     }
-    //val workerShareList = getWorkerShareNumber("testWorker")
+
     val workerShareList = config.getParameters.getWorkerList.map(getWorkerShareNumber)
+    val totalShares = workerShareList.sum
     //println(totalShares)
     //workerShareList.foreach(println)
     // println(workerShareList.mkString("Array(", ", ", ")"))
