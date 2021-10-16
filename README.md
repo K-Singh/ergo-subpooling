@@ -46,7 +46,7 @@ The transaction fee is split up evenly between each member of the subpool.
 To run, simply download the jar and run 
 ```java -jar ergo-subpooling-0.2.jar``` 
 in command line or terminal.
-### [Download Here](https://github.com/K-Singh/ergo-subpooling/raw/master/ergo-subpooling-0.2.jar)
+### [Download Here](https://github.com/K-Singh/ergo-subpooling/raw/master/ergo-subpooling-0.3.jar)
 If it says you need a subpool_config.json file, look at the one given [here](https://github.com/K-Singh/ergo-subpooling/blob/309a5e7d957a5455a8856d4ef251ab80c757b1d9/subpool_config.json) in the repository as an example.
 
 Alternatively, you may clone the repository and run: 
