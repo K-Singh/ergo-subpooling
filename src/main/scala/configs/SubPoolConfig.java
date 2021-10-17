@@ -36,6 +36,14 @@ public class SubPoolConfig {
         return parameters;
     }
 
+    public void setParameters(SubPoolParameters parameters) {
+        this.parameters = parameters;
+    }
+
+    public void setNode(SubPoolNodeConfig node) {
+        this.node = node;
+    }
+
     /**
      * Load config from the given reader.
      *

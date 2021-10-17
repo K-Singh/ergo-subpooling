@@ -1,21 +1,20 @@
 package app
 
 import com.google.gson.GsonBuilder
-import configs.{SubPoolConfig, SubPoolNodeConfig, SubPoolParameters}
+import configs.{ConfigBuilder, SubPoolConfig, SubPoolNodeConfig, SubPoolParameters}
 import contracts.ConsensusStageHelpers.{buildConsensusFromBoxes, buildOutputsFromConsensus, findValidInputBoxes, generateConsensusContract}
 import contracts.HoldingStageHelpers.generateHoldingOutputRegisterList
 import contracts.{ConsensusStageHelpers, HoldingStageHelpers}
-import okhttp3.{OkHttpClient, Request}
-import org.ergoplatform.appkit.config.ErgoNodeConfig
-import org.ergoplatform.appkit.{Address, ErgoClient, ErgoContract, ErgoProver, ErgoToken, ErgoValue, InputBox, Mnemonic, NetworkType, OutBox, Parameters, RestApiErgoClient, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
-import pools.{EnigmaPoolRequests, HeroMinersRequests}
-import test.SubPool_Test_2_Miners.{consensusValue, miner1Address, workerName1}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoContract, ErgoProver, ErgoToken, ErgoValue, InputBox, Mnemonic, NetworkType, OutBox, Parameters, RestApiErgoClient, SecretStorage, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
+import pools.PoolGrabber.{requestFromEnigmaPool, requestFromHeroMiners}
 
-import scala.:+
+import java.io.File
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConverters._
+import ShellHelper._
 
 object AppCommands {
+
 
   def help = {
     println("======================================================================================================")
@@ -34,24 +33,39 @@ object AppCommands {
     println("Currently, subpooling only works with EngimaPool, but more pools should be on the way.")
     println("======================================================================================================")
     println("Commands:")
-    println("create - Create subpool by entering in parameters")
-    println("load - Load subpool from config")
-    println("---- withdraw - Send withdrawal request to smart contract using information obtained from a mining pool")
-    println("--------enigma - Get withdrawal info from Enigma Pool")
-    println("--------hero - Get withdrawal from HeroMiners Pool")
-    println("---- distribute - Sign transaction from consensus stage and distribute rewards to members. All members must have sent a")
-    println("                  withdrawal request in order for this to work")
-    println("help - Show this help message")
+    println("create             - Create subpool by entering in parameters")
+    println("load [config.json] - Load subpool from config")
+    println("------withdraw     - Send withdrawal request to smart contract using information obtained from a mining pool")
+    println("------------enigma - Get withdrawal info from Enigma Pool")
+    println("------------hero   - Get withdrawal from HeroMiners Pool")
+    println("------distribute   - Sign transaction from consensus stage and distribute rewards to members. All members must have sent a")
+    println("                     withdrawal request in order for this to work")
+    println("------join         - Join the loaded subpool. This will replace the wallet-name and worker-name with new valid inputs.")
+    println("wallets            - Load wallet/signer commands")
+    println("------list         - List current saved wallets/signers")
+    println("------new          - Create a new wallet/signer from a mneumonic. You can restore wallets from other ")
+    println("                     sources given that you have the secret phrase.")
+    println("help               - Show this help message")
     println("======================================================================================================")
     println("======================================================================================================")
   }
 
   def create(client: ErgoClient, config: SubPoolConfig) = {
-    println("Please start by entering the addresses of you and each miner in your pool. Press enter after each address. Type \"done\" when complete, or \"exit\" to stop. ")
+    implicit val shellState: ShellState = ShellStates.createState
+    println("\nTo create a subpool, you must first associate this subpool with a wallet/signer. Type in the name of your wallet/signer and press enter.")
+    println("You may create a new wallet/signer using the \"wallets\" and \"new\" command from the main menu.")
+    var secretName = shellInput
+    if(accessWallet(shellState, secretName).isLocked){
+      println("This wallet could not be accessed!")
+      sys.exit(0)
+    }
+
+
+    println("\nNow enter the addresses of you and each miner in your pool. Press enter after each address. Type \"done\" when complete, or \"exit\" to stop. ")
     val addressList : ListBuffer[String] = ListBuffer.empty[String]
     val workerList: ListBuffer[String] = ListBuffer.empty[String]
 
-    Iterator.continually(scala.io.StdIn.readLine)
+    Iterator.continually(shellInput)
       .takeWhile(_ != "done")
       .foreach{ str:String =>
         str match {
@@ -60,8 +74,8 @@ object AppCommands {
 
         }
       }
-    println("Now enter the worker names that correspond to each address in the order that they were given. Press enter after each name and type \"done\" when complete.")
-    Iterator.continually(scala.io.StdIn.readLine)
+    println("\nNow enter the worker names that correspond to each address in the order that they were given. Press enter after each name and type \"done\" when complete.")
+    Iterator.continually(shellInput)
       .takeWhile(_ != "done")
       .foreach{ str:String =>
         str match {
@@ -71,9 +85,9 @@ object AppCommands {
         }
       }
 
-    println("Please re-enter YOUR own worker name. Other members of your pool will enter their worker names into their own config.")
+    println("\nPlease re-enter YOUR own worker name. Other members of your pool will enter their worker names into their own config.")
     println("Duplicate worker names will cause issues so make sure that all members of your pool input their names correctly!")
-    val workerName = scala.io.StdIn.readLine()
+    val workerName = shellInput
     var minerAddresses = ListBuffer.empty[Address]
     try{
     minerAddresses = addressList.map{(s: String) => Address.create(s)}
@@ -84,7 +98,7 @@ object AppCommands {
 
 
     println("Finally, enter your mining pool's minimum payout in ERG: ")
-    val minPayout: Double = scala.io.StdIn.readDouble()
+    val minPayout: Double = shellDouble
 
     client.execute(ctx => {
       val consensusContract = ConsensusStageHelpers.generateConsensusContract(ctx, minerAddresses.toList, (minPayout * Parameters.OneErg).toLong)
@@ -93,20 +107,37 @@ object AppCommands {
       val holdingContract = HoldingStageHelpers.generateHoldingContract(ctx, minerAddresses.toList, (minPayout * Parameters.OneErg).toLong, consensusAddress)
       val holdingAddress = contracts.generateContractAddress(holdingContract, config.getNode.getNetworkType)
 
-      val gson = new GsonBuilder().setPrettyPrinting().create()
       val parameters = new SubPoolParameters(workerName, addressList.toArray, workerList.toArray , holdingAddress.toString, consensusAddress.toString, minPayout)
-      println("\n\n")
-      println(gson.toJson(parameters))
-      println("\nPlease copy the above into your config file. The curly brackets should start next to the parameters field.")
-      println("All miners in your subpool should also copy this while making sure to change their worker name.\n")
-      println("")
-      println("You have finished creating your subpool! Press enter to exit the program.")
-      scala.io.StdIn.readLine()
-      sys.exit(0)
+      val newConfig = ConfigBuilder.newCustomConfig(secretName, parameters)
+      println("Your config file has been created! Where would you like to save it?")
+      println("Enter \"default\" for default config file. Enter \"some_config_name_here.json\" to save to a custom file. Enter anything else to cancel and return to main menu.")
+
+      def endText = {
+        println("Please ensure all miners in your subpool use this file! Also ensure they use their own unique wallet/signer and workerName!")
+        println("")
+        println("You have finished creating your subpool! Press enter to return to main menu.")
+        shellInput
+      }
+
+      shellInput match {
+        case "default" =>
+          println("Saving file to default config: " + ConfigBuilder.defaultConfigName)
+          ConfigBuilder.writeConfig(ConfigBuilder.defaultConfigName, newConfig)
+          endText
+        case name:String if name.endsWith(".json") =>
+          println("Saving file to custom config: " + name)
+          ConfigBuilder.writeConfig(name, newConfig)
+          endText
+        case _ =>
+          println("Cancelling and returning to main menu...")
+      }
+
     })
   }
 
   def load(ergoClient: ErgoClient, config: SubPoolConfig, configPath:String ="") = {
+    implicit val shellState = ShellStates.loadState
+
     var currentConfig = config
     var currentErgoClient = ergoClient
     if(configPath.isEmpty) {
@@ -119,10 +150,9 @@ object AppCommands {
       currentErgoClient = RestApiErgoClient.create(newNodeConf.getNodeApi.getApiUrl, newNodeConf.getNetworkType, newNodeConf.getNodeApi.getApiKey, explorerUrl)
       println(s"Config file ${configPath} has been loaded.")
     }
-    println("Please ensure your wallet details in the config are correct before performing any commands!")
-    println("Enter \"withdraw\", \"distribute\", or \"exit\":")
-    Iterator.continually(scala.io.StdIn.readLine)
-      .takeWhile(_ != "done")
+    println("\nEnter \"withdraw\", \"distribute\" or \"join\". Enter \"back\" to return to main menu.")
+    Iterator.continually(shellInput)
+      .takeWhile(_ != "back")
       .foreach{ str:String =>
         str match {
           case "withdraw" => try{withdraw(currentErgoClient, currentConfig)}catch {
@@ -135,6 +165,7 @@ object AppCommands {
               println(" ErrorVal: " + err.getMessage)
               println(" StackTrace: " + err.printStackTrace())
           }
+          case "join" => join(currentConfig, configPath)
           case "exit" => sys.exit(0)
           case _: String =>
         }
@@ -142,11 +173,12 @@ object AppCommands {
   }
 
   def withdraw(ergoClient: ErgoClient, config: configs.SubPoolConfig) = {
+    implicit val shellState: ShellState = ShellStates.withdrawState
     var workerShareList = Array.empty[Long]
     var totalShares = 0L
-    println("Please enter the mining pool that your subpool currently mines to.")
+    println("\nPlease enter the mining pool that your subpool currently mines to.")
     println("Enter \"enigma\" for Enigma Pool or \"hero\" for HeroMiners:")
-    val poolName = scala.io.StdIn.readLine()
+    val poolName = shellInput
     try {
       poolName match {
         case "enigma" =>
@@ -168,12 +200,7 @@ object AppCommands {
     }
 
     ergoClient.execute(ctx => {
-      val prover: ErgoProver = ctx.newProverBuilder
-        .withMnemonic(
-          SecretString.create(config.getNode.getWallet.getMnemonic),
-          SecretString.create(config.getNode.getWallet.getPassword))
-        .withEip3Secret(0)
-        .build()
+      val prover: ErgoProver = createProver(shellState, ctx, config.getNode.getWallet.getWalletName)
 
       var provingAddress = prover.getAddress
       val holdingAddress = Address.create(config.getParameters.getHoldingAddress)
@@ -209,19 +236,14 @@ object AppCommands {
         .build()
       val signed: SignedTransaction = prover.sign(tx)
       val txId: String = ctx.sendTransaction(signed)
-      println(s"Your withdrawal request was successful! Your transaction id is: ${txId}")
+      println(s"\nYour withdrawal request was successful! Your transaction id is: ${txId}")
     })
   }
 
   def distribute(ergoClient: ErgoClient, config: SubPoolConfig) = {
-
+    implicit val shellState: ShellState = ShellStates.loadState
     ergoClient.execute(ctx => {
-      val prover: ErgoProver = ctx.newProverBuilder
-        .withMnemonic(
-          SecretString.create(config.getNode.getWallet.getMnemonic),
-          SecretString.create(config.getNode.getWallet.getPassword))
-        .withEip3Secret(0)
-        .build()
+      val prover: ErgoProver = createProver(shellState, ctx, config.getNode.getWallet.getWalletName)
 
       val minerAddressList = config.getParameters.getMinerAddressList.map(Address.create)
       val consensusAmnt: Long = ((config.getParameters.getMinimumPayout*Parameters.OneErg)/minerAddressList.size).toLong
@@ -253,71 +275,122 @@ object AppCommands {
       // Sign transaction of mining pool to holding box
       val signed: SignedTransaction = prover.sign(tx)
       val txId: String = ctx.sendTransaction(signed)
-      println(s"Your distribution transaction was successful! Your transaction id is: ${txId}")
+      println(s"\nYour distribution transaction was successful! Your transaction id is: ${txId}")
     })
   }
 
-  // Send Request To Enigma Pool, format responses into useable values
-  def requestFromEnigmaPool(config: SubPoolConfig): (Array[Long], Long) = {
-    val gson = new GsonBuilder().create()
-    val addrStr = config.getParameters.getHoldingAddress
-    val httpClient = new OkHttpClient()
-
-    val reqTotalShares = new Request.Builder().url(s"https://api.enigmapool.com/shares/${addrStr}").build()
-    val respTotalShares = httpClient.newCall(reqTotalShares).execute()
-    val respString1 = respTotalShares.body().string()
-
-    val sharesReqObject = gson.fromJson(respString1, classOf[EnigmaPoolRequests.SharesRequest])
-    val totalShares = sharesReqObject.shares.valid.toLong
-
-    val reqWorkerShares = new Request.Builder().url(s"https://api.enigmapool.com/workers/${addrStr}").build()
-    val respWorkerShares = httpClient.newCall(reqWorkerShares).execute()
-    val respString2 = respWorkerShares.body().string()
-
-    val workerReqObject = gson.fromJson(respString2, classOf[EnigmaPoolRequests.WorkerRequest])
-    def getWorkerShareNumber(workerName: String) = {
-      val worker = workerReqObject.workers.toList.find{(w: EnigmaPoolRequests.Worker) => w.worker == workerName}
-      if(worker.isDefined){
-        worker.get.shares.toLong
-      }else{
-        println(s"Error: Worker ${workerName} could not be found!")
+  /**
+   * Command that opens up wallet access. Can create and list wallets here.
+   */
+  def wallets() ={
+    implicit val shellState: ShellState = ShellStates.walletsState
+    println("\nTo list your current wallets/signers, type \"list\". To create a new wallet/signer, type \"new\"")
+    val walletCmd = shellInput
+    walletCmd match {
+      case "list" =>
+        val secretDirs = new File("./data/")
+        try {
+          secretDirs.listFiles().foreach { (f: File) => println(f.getName) }
+        }catch {
+          case err:NullPointerException => println("You have no wallets/signers.")
+        }
+      case "new" => newSecret()
+      case _ => println("That command is invalid!")
         sys.exit(0)
-      }
-    }
-    //val workerShareList = getWorkerShareNumber("testWorker")
-    val workerShareList = config.getParameters.getWorkerList.map(getWorkerShareNumber)
-    //println(totalShares)
-    //workerShareList.foreach(println)
-    // println(workerShareList.mkString("Array(", ", ", ")"))
-    (workerShareList, totalShares)
-  }
-
-  def requestFromHeroMiners(config: SubPoolConfig): (Array[Long], Long) ={
-    val gson = new GsonBuilder().create()
-    val addrStr = config.getParameters.getHoldingAddress
-    val httpClient = new OkHttpClient()
-
-    val reqPoolState = new Request.Builder().url(s"https://ergo.herominers.com/api/stats_address?address=${addrStr}").build()
-    val respPoolState = httpClient.newCall(reqPoolState).execute()
-    val respString = respPoolState.body().string()
-    //println(respString)
-    val poolStateObject = gson.fromJson(respString, classOf[HeroMinersRequests.PoolState])
-
-    def getWorkerShareNumber(workerName: String) = {
-      val worker = poolStateObject.workers.toList.find{(w: HeroMinersRequests.Worker) => w.name == workerName}
-      if(worker.isDefined){
-        worker.get.shares_good
-      }else{
-        println(s"Error: Worker ${workerName} could not be found!")
-        sys.exit(0)
-      }
     }
 
-    val workerShareList = config.getParameters.getWorkerList.map(getWorkerShareNumber)
-    val totalShares = workerShareList.sum
-    //println(totalShares)
-    //workerShareList.foreach(println)
-    // println(workerShareList.mkString("Array(", ", ", ")"))
-    (workerShareList, totalShares)
+    def newSecret(): Unit ={
+      implicit val shellState: ShellState = ShellStates.newState
+      println("\nPlease begin by entering your mneumonic. This mneumonic/phrase must be the secret key that corresponds to one unique address in your subpool.")
+      println("Enter your phrase all lowercase, with spaces between each word. Press enter when complete. Example: \"this is the secret phrase to an address i own\"")
+      val secretPhrase = SecretString.create(shellInput)
+      println("Please enter your mneumonic password. If you are unsure of what this is, simply leave it blank and press enter.")
+      val secretPhrasePass = SecretString.create(shellInput)
+      println("Please enter an encryption password to encrypt your data:")
+      val secretPass = SecretString.create(shellInput)
+      val newMneumonic = Mnemonic.create(secretPhrase, secretPhrasePass)
+      println("Finally, enter the name of this wallet/signer. You can use this name to load this wallet/signer into future subpools.")
+      val secretDir = shellInput
+      val secStorage = SecretStorage.createFromMnemonicIn("data/"+secretDir, newMneumonic, secretPass)
+      println("New wallet/signer created!")
+    }
   }
+
+  def join(config: SubPoolConfig, configPath:String = "") = {
+    implicit val shellState:ShellState = ShellStates.joinState
+    var fileName = configPath
+    if(configPath.isEmpty){
+      fileName = ConfigBuilder.defaultConfigName
+    }
+    val oldParams = config.getParameters
+    val addressList = oldParams.getMinerAddressList
+    val workerList = oldParams.getWorkerList
+    val holdingAddress = oldParams.getHoldingAddress
+    val consensusAddress = oldParams.getConsensusAddress
+    val minPayout = oldParams.getMinimumPayout
+    println("\nTo join this subpool, please enter the wallet/signer name you would like to use in this subpool.")
+    val secretName = shellInput
+    val storedWallet = accessWallet(shellState, secretName)
+    println("\nNow enter the worker name you would like to use in this subpool.")
+    val workerName = shellInput
+    if(!workerList.contains(workerName)){
+      println(s"Worker name ${workerName} is not present in list of workers!")
+      workerList.foreach(println)
+      sys.exit(0)
+    }
+    val parameters = new SubPoolParameters(workerName, addressList.toArray, workerList.toArray , holdingAddress.toString, consensusAddress.toString, minPayout)
+    val newConfig = ConfigBuilder.newCustomConfig(secretName, parameters)
+    ConfigBuilder.writeConfig(fileName, newConfig)
+    println(s"You have successfully joined the subpool in config file ${fileName}!")
+  }
+
+  /**
+   * Access wallet/signer
+   * @param shellState Current ShellState
+   * @param secretName Name of wallet/signer to access
+   * @return returns loaded SecretStorage. Exits in case of error.
+   */
+  def accessWallet(implicit shellState: ShellState, secretName: String): SecretStorage ={
+    val secretDir = new File("./data/"+secretName+"/")
+    var secretFile = secretDir
+    if(secretDir.isDirectory){
+      secretFile = secretDir.listFiles()(0)
+    }else{
+      println(s"The wallet/signer with name: ${secretName} could not be found!")
+      sys.exit(0)
+    }
+    val loadedStorage = SecretStorage.loadFrom(secretFile)
+    println(s"Please enter the encryption password for wallet/signer ${secretName}")
+    val secretPass = shellInput
+    try {
+      loadedStorage.unlock(secretPass)
+    }catch{
+      case err:RuntimeException =>
+        println("The encryption password was incorrect!")
+        sys.exit(0)
+    }
+    println(s"Wallet/Signer ${secretName} was successfully accessed!")
+     loadedStorage
+  }
+
+  /**
+   * Creates ErgoProver by accessing wallet secret storage
+   * @param shellState Current ShellState
+   * @param ctx Current BlockchainContext
+   * @param secretName Name of wallet/signer to make prover from
+   * @return ErgoProver made from secret key in SecretStorage
+   */
+  def createProver(implicit shellState:ShellState, ctx:BlockchainContext, secretName: String): ErgoProver ={
+    val storedWallet = accessWallet(shellState, secretName)
+      if(storedWallet.isLocked) {
+        println("A prover could not be made from this wallet/signer!")
+        sys.exit(0)
+      }
+    val prover: ErgoProver =
+      ctx.newProverBuilder
+        .withSecretStorage(storedWallet)
+        .withEip3Secret(0)
+        .build()
+    prover
+    }
 }
