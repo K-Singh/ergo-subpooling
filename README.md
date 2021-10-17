@@ -119,7 +119,19 @@ pause
 ```
 
 Once this has been done, the subpool is completely set up and each member should have begun mining to it.
-  
+
+## Commands In Subpooling Shell
+Command | Description 
+--------|------------
+*create* | Creates subpool using wallet/signer and inputted information. Subpool is then saved to config file.
+*load*  | Loads subpool from default config.
+*load [config.json]* | load subpool from specified config file.
+*join* | Join subpool in config file. Input wallet/signer and worker name so that requests can be handled correctly.
+*withdraw* | Send withdraw request to holding box. Once all members have sent a wd request, distribution may occur.
+*distribute* | Distributes money amongst members of subpool. Only one member of the subpool needs to do this.
+*wallets* | Enters wallet/signer mode.
+*list* | List wallet/signers that you have made.
+*new* | Create a new wallet/signer.
 
 # Current Supported Mining Pools
 https://enigmapool.com
