@@ -64,7 +64,7 @@ somewhere safe. Also make sure you remember the encryption password to access yo
 
 After this, you can go back to the main menu and type ```create``` to create a new subpool. The program will first ask for the wallet/signer name to be using, along
 with the corresponding encryption password. Once filled, you may type or paste in each address that's part of your subpool(The wallet address that corresponds to your
-mneumonic should be a part of these. You must then enter an associated worker name for each address. Order matters, the first worker name belongs to the first address
+mneumonic should be a part of these). You must then enter an associated worker name for each address. Order matters, the first worker name belongs to the first address
 and so on.
 
 Finally you will be asked one more time to confirm your worker name. You will then enter your pool's payout information. Once this is done you may enter ```default```
