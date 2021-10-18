@@ -44,9 +44,9 @@ The transaction fee is split up evenly between each member of the subpool.
 
 # How To Run
 To run, simply download the jar and run 
-```java -jar ergo-subpooling-0.2.jar``` 
+```java -jar ergo-subpooling-0.4.jar``` 
 in command line or terminal.
-### [Download Here](https://github.com/K-Singh/ergo-subpooling/raw/master/ergo-subpooling-0.3.jar)
+### [Download Here](https://github.com/K-Singh/ergo-subpooling/raw/master/ergo-subpooling-0.4.jar)
 If it says you need a subpool_config.json file, look at the one given [here](https://github.com/K-Singh/ergo-subpooling/blob/309a5e7d957a5455a8856d4ef251ab80c757b1d9/subpool_config.json) in the repository as an example.
 
 Alternatively, you may clone the repository and run: 
@@ -57,13 +57,21 @@ sbt assembly
 In this way you can get around running a precompiled jar.
 
 ## Instructions
-Once the program is running, you may either create a subpool, or load one from the config. To create a subpool, simply type ```create``` into the console.
-The program will ask for the payment address of each subpool member. Once these have been inputted type ```done``` and then input the worker names that each miner will use.
-Worker names should be entered in the same order as the addresses. The program will then ask for your worker name again. This is to ensure that each member of the subpool has some unique address that corresponds to their unique worker name. Finally, the mining pool's payout amount must be inputted. 
+Once the program is running, you can start working towards your subpool. First, you should go use the ```wallets``` and ```new```commands to create a new wallet/signer.
+A wallet/signer is necessary to prove that you own one of the addresses in your subpool. The wallet/signer is stored in an encrypted file. If you feel unsafe using your
+main wallet, I would suggest making a new wallet just for subpooling. Please make sure the mneumonic and possible mneumonic password for your wallet/signer is stored
+somewhere safe. Also make sure you remember the encryption password to access your wallet/signer.
 
-By following these steps, the program will print out some JSON text that you can then paste into your ```subpool_config.json```. This text should be pasted into the
-```parameters``` field of your config file. Each member of the subpool will paste this same exact text into their config file with one change. The field ```workerName```
-should be different in each subpool member's config file and will correspond to that member's worker name. 
+After this, you can go back to the main menu and type ```create``` to create a new subpool. The program will first ask for the wallet/signer name to be using, along
+with the corresponding encryption password. Once filled, you may type or paste in each address that's part of your subpool(The wallet address that corresponds to your
+mneumonic should be a part of these). You must then enter an associated worker name for each address. Order matters, the first worker name belongs to the first address
+and so on.
+
+Finally you will be asked one more time to confirm your worker name. You will then enter your pool's payout information. Once this is done you may enter ```default```
+or some ```config.json```. This will be where your subpool will be saved. ```default``` will save your subpool to ```subpool_config.json```.
+
+Once this has been done, you may send your config file to everyone else in your subpool. They can then use the ```load``` and ```join``` commands to input their
+unique worker names and associate their wallets/signers to this subpool.
 
 ## Example Of Parameter Fields Of Two Members Of The Same Subpool:
 
@@ -102,7 +110,7 @@ should be different in each subpool member's config file and will correspond to 
   } 
   ```
   ## Final Steps
-After this, members should ensure that the secret mneumonic phrase corresponding to their address in the subpool is inputted in the wallets section of their ```subpool_config.json```. When this phrase and the wallet spending password have been inputted, the subpool member will be eligible to send withdrawal and distribution requests to the smart contracts protecting their funds. The only thing left to do after this is to enter the ```holdingAddress``` into their mining software. For example, if Member One
+The only thing left to do after this is to enter the ```holdingAddress``` into their mining software. For example, if Member One
 used NBMiner to mine, they would simply enter this into their NBMiner's ```start_ergo.bat```:
 
 ```
@@ -111,7 +119,19 @@ pause
 ```
 
 Once this has been done, the subpool is completely set up and each member should have begun mining to it.
-  
+
+## Commands In Subpooling Shell
+Command | Description 
+--------|------------
+*create* | Creates subpool using wallet/signer and inputted information. Subpool is then saved to config file.
+*load*  | Loads subpool from default config.
+*load [config.json]* | load subpool from specified config file.
+*join* | Join subpool in config file. Input wallet/signer and worker name so that requests can be handled correctly.
+*withdraw* | Send withdraw request to holding box. Once all members have sent a wd request, distribution may occur.
+*distribute* | Distributes money amongst members of subpool. Only one member of the subpool needs to do this.
+*wallets* | Enters wallet/signer mode.
+*list* | List wallet/signers that you have made.
+*new* | Create a new wallet/signer.
 
 # Current Supported Mining Pools
 https://enigmapool.com
