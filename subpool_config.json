@@ -5,26 +5,22 @@
       "apiKey": ""
     },
     "wallet": {
-      "mnemonic": "ENTER WALLET MNEMONIC HERE",
-      "password": "ENTER WALLET PASSWORD HERE",
-      "mnemonicPassword": ""
+      "walletName": "wallet1"
     },
     "networkType": "MAINNET"
   },
-  "parameters":{
-    "workerName": "testWorker",
+  "parameters": {
+    "workerName": "Cheesy1",
     "minerAddressList": [
-      "Qqk7Nnpjn6kmJfgt9KHY4mtLN24QGGEshGCu5XRqDTdjbXAp",
-      "9KHY4mtLN24QGGEshGCu5XRqDTdjbXApYzrE9PMdjnJ4mtLt",
-      "EshGCu5XRqDTdjbXApYzrE9PMdjnJeMpWE5DUiJh4mtLN24QG"
+      "9ee6y7xfDjHH46CmhXk9NPwvSCJZb7574UsDuk6F8DbvNb4Nd2H",
+      "9fAp1CxusTAw9HpqQ9mxBSFjdn17fWQumw8FE25X8PaYZdzEUNr"
     ],
     "workerList": [
-      "testWorker",
-      "worker2",
-      "worker3..."
+      "Cheesy1",
+      "Cheesy2"
     ],
-    "holdingAddress": "TkfL4THF4V3g42Qqk7Nnpjn6kmJfgt9KHY4mtLN24QGGEshGCu5XRqDTdjbXApYzrE9PMdjnJeMpWE5DUiJh2FJN9D5aPAjxN5U1TQKGXbFEenponNMdqtaGtCHRbBfjPNGA2GXZmrftHZtbHXywNacocpcNZAD7Mwf3hEzkcaoeJC5w7k737LZPAwDtFhwS1SHDygKnyF7P3iw5W7p68qUg7Sn2pbhbLapPbAryUWGokZJSv9e6KUCa1aK5Rc2r3QjKPizLFjmFNJcktF2j9m2g3WsnTcf1beqAfK6GnKCN2gcoNpFDEKmQJW6NcKMPUEewX5dfWAiH29p7Jox22Q9UTb3fDWSycRtuHZN9K",
-    "consensusAddress": "3znqbr9DEMoxqWA7Cu3rV9Yo9fj8wUpTnq92vAcUwt2J1f5yZrY4FMNETvY7Dk5DoEsia1jib7CYTJ4bGReNg2Zi8ocz85qeYqYWVjTBGAyUGU1sNLYjsaYHju3RewWyu65xWEqgvL3ymCmndfQdzJd6A1NEMkaaF2ZCgJJRk6ovE9KBpyDh54AdvbPRVtUaV7T3cHJMwezZNsyQdGJDhHqnBzUgVyxSLzrYLTUHwgmdjRTShEdust4tcxhVZ1dWjDWZ2wZheo3GutP8PMLfRdyYG3JV69UiuVoTrDh58NyeVmYVtBdJcP4oiJ8RrRnmQ7f7GDi79ysqfE9iyJGDQpRLvHE26jfNycnEVXg3FKTd17LE5GwUb7de4M7iWgoyXZTHrHX9UNQYQsZecZYdmmmSiWmW3fBAmdpK6QiicZgtkSnKyewenpGf4PCtvDTF3roDsyWs7VV6mCJXsmypAdyUkbJY3yTTLvw84CnTRSdW4vQepYNin9ukBVac4d3jYrsSwqj2iggMrwZQjHJhuYg2DsnvSVzvBSC97i",
-    "minimumPayout": 0.2
+    "holdingAddress": "WHJstQTcoubbKgjgX4QqPBm2BwWB1koFuii6MEw2yPi7d4GQz6ZYqwzYzWhZpgAfDbVC2zKLfQ9L4oGmJJQ15Pbcq62Dqu4u1r6pLZ84ZvpR2hUy8PtU5Hegq2QrBMqeMLKXTjgyZPzLEKFQRwFevggGjf9RMBHuSWB2GCJwb6ehaH2uxtzThq6J9tEbMQVs22LQfztsPzQPnDn1mtJfgnbbf2aqkdwojbJdNqCLFKiP2wjxDFZZWyFMNaGj4tGq3wKkrQh3CXSd4q6nLmikt9Qr4sb8eV2Uwn8MtMyrk3WMN8i36GXXuBtzgJUYLE6vybWWuqZDTnzxj5f4Q3gZFaoLpHjFihsq8KZ3aCV394BweKLRJEEUXBbR",
+    "consensusAddress": "3DJapyV1Wu3U9v6dutktceMd95uWNL4rs8PBavL9tBNyHyHZABFSmYBpVHRULVEAN8n9t42k2TfVWYR7Fm55aWashyNHvhkhhwdbhBDbyopND9E3HgD3M3n3Do6xmDFoe2Ur2Kt2woUGgnBv1ZapWBMXtiYjk1oCC2n8CRDnnhKnAQkz9kL56mKKSNCRmBz7QKNXmYrz99gWyu83q6EgVADKBjyCSGNa3eD1iU6wDNnSbtWNr62dTtYqy97yCHDCgQM9nRRA4dSLcv2bCpTrD43545MpXR6iSCoypBAUvKBSZFuqtnpVR9zLokncfJ4144p3AreVAudNeaN2E3iby4RD7vJ64MxD5R2XrgofdHc15mFWaWeHbnsqZMzMJ54vsauFx88jTpay9FKw3yf5QdHFNftxEucAupzYTJpB9JR6whT2VkYR2DBF5w1B5Nb944DFnZwHRfD9dkhkK5813sNRopbbW6p5HYVrXkuJ1hSXLnFA2dzaAWz1QNakyUphUm3KKnsuzLF8pBgYemeH6dYa1VReSiYc2ad77VD3XaXoB4vGx",
+    "minimumPayout": 0.5
   }
 }
