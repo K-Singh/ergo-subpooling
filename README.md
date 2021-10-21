@@ -30,11 +30,11 @@ Now that both Bob and Alice have sent withdraw requests, either Bob or Alice can
 
 From this consensus, the smart contract will determine how much ERG each member of the subpool will get. In this case, Alice will get:
 
-```(75 / 112.5) * (0.5 - (MinTxFee / 2)) = ~0.32```
+```(75 / 112.5) * (0.5 - (MinTxFee / 2)) = ~0.32 ERG```
 
 While Bob will get:
 
-```(37.5 / 112.5) * (0.5 - (MinTxFee / 2)) = ~0.16```
+```(37.5 / 112.5) * (0.5 - (MinTxFee / 2)) = ~0.16 ERG```
 
 The transaction fee is split up evenly between each member of the subpool.
 
