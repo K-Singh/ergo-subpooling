@@ -2,9 +2,7 @@
 ergo-subpooling is a smart contract based mining pool that allows groups of friends to pool together their hashrates in order to get mining pool rewards quicker than they would alone. Subpooling allows members to mine to the same address without worrying about one person controlling the funds. The goal of this dApp is to help encourage decentralization of mining pools while also promoting small time miners who may not be able to get block rewards fast enough on normal mining pools. This project was developed for ERGOHACK II.
 
 # How It Works
-Subpooling allows for groups of friends to mine to the same address on a mining pool(Currently either Enigma Pool or HeroMiners). Any member of the subpool may enter the
-```create``` command and input all of the required information to make the subpool. At the end, they will get some text that they can paste into the ```parameters``` field of their ```subpool_config.json```. To ensure that everyone is mining to the correct subpool, each member of the subpool will copy and paste this same text into their own parameters field.
-The only field that members will have to change will be the ```workerName``` field.
+Subpooling allows for groups of friends to mine to the same address on a mining pool(Currently either Enigma Pool or HeroMiners). Any member of the potential subpool may enter the ```create``` command and input all of the required information to make the subpool. At the end, they will be able to save their subpool to a config file. This config file may then be loaded using the ```load``` command to load the subpool into someone else's subpooling program. This person may then enter ```join``` so that the ```wallet/signer``` and ```workerName``` fields may be properly updated. By going through these steps, you can have all subpool members join the subpool and be able to send withdrawal and distribution requests. Members of the subpool will then take the ```holdingAddress``` field inside the config file and paste it into the wallet field of any Ergo miner of their choice. The mining program must connect to a mining pool supported by ergo-subpooling.
 
 ## The Holding Phase
 Once enough mining has been done, the mining pool will send a payout to the subpool. At this point, each member of the mining pool may send a withdraw request to the
@@ -13,12 +11,10 @@ by each subpool member, along with the total share's submitted by the entire poo
 
 ## The Consensus Phase
 At this point, all member's have submitted their withdraw requests to the smart contract. Now, any member of the subpool may enter the ```distribute``` command into their
-subpooling program. At this point, the smart contract will take the average of each subpool state sent by each member and reach a consensus about the subpool's state.
-This consensus will then be used to figure out how much ERG each member of the subpool gets from the total payout. Members of the subpool are paid according to the proportion
-of shares they submitted to the subpool.
+subpooling program. This will cause the smart contract to take the average of each subpool state sent by each member and reach a consensus about the shares submitted by each member of the subpool. This consensus will then be used to figure out how much ERG each member of the subpool gets from the total payout. Members of the subpool are paid according to the proportion of shares they submitted to the subpool.
 
 ## An Example
-Alice and Bob are both mining to Herominers and decide to make a subpool. They go through the program instructions and then mine to the subpool for a few days until they get their payout of 0.5 ERG. Alice decides to send a withdraw request first, she enters the ```withdraw``` command which pings Herominers for information about the subpool. Herominers then sends the information back to Alice's subpooling program. This information is then sent to the smart contract protecting Alice and Bob's funds. The information consists of 3 things: Alice's share number, Bob's share number, and the total Share number. 
+Alice and Bob are both mining to Herominers and decide to make a subpool. They go through the program instructions and then mine to the subpool for a few days until they get their payout of 0.5 ERG. Alice decides to send a withdraw request first, she enters the ```withdraw``` command which pings Herominers for information about the subpool. Herominers then sends the information back to Alice's subpooling program. This information is then sent to the smart contract protecting Alice and Bob's funds. The information consists of 3 things: Alice's share number, Bob's share number, and the total share number. 
 
 Lets say during Alice's withdraw request, the information she got was:
 
