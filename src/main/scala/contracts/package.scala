@@ -8,12 +8,13 @@ import special.sigma.SigmaProp
 package object contracts {
 
   def genSigProp(addr: Address): SigmaProp = {
-    proveDlog(SigmaDsl.GroupElement(addr.getPublicKey.value))
+    proveDlog(addr.getPublicKeyGE)
   }
 
   def genDlog(addr: Address): ProveDlog = {
     addr.getPublicKey
   }
+
 
   def generateContractAddress(contract: ErgoContract, networkType: NetworkType): Address = {
     Address.fromErgoTree(contract.getErgoTree, networkType)
