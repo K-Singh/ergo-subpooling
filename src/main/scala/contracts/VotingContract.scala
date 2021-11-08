@@ -7,7 +7,7 @@ import scalan.RType
 import scorex.crypto.hash.Blake2b256
 import sigmastate.basics.DLogProtocol.ProveDlog
 import special.collection.Coll
-import special.sigma.{SigmaProp, SigmaPropRType}
+import special.sigma.{GroupElement, SigmaProp, SigmaPropRType}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 import scala.collection.mutable.ListBuffer
@@ -38,22 +38,20 @@ object VotingContract {
 
        // Unzips list of members(tuples of type (SigmaProp, Coll[Byte]]) into tuple of type (Coll[SigmaProp], Coll[Coll[Byte]])
        val unzipMemberList = {
-        (memberMap: Coll[(SigmaProp, Coll[Byte])]) =>
+        (memberMap: Coll[(GroupElement, Coll[Byte])]) =>
           (memberMap.map{
-            (memVote: (SigmaProp, Coll[Byte])) =>
+            (memVote: (GroupElement, Coll[Byte])) =>
               memVote._1
           },
           memberMap.map{
-            (memVote: (SigmaProp, Coll[Byte])) =>
+            (memVote: (GroupElement, Coll[Byte])) =>
               memVote._2
           })
        }
        val MEMBER_LIST = if(METADATA_VALID){
-          METADATA_BOX.R5[Coll[(SigmaProp, Coll[Byte])]].get
+          METADATA_BOX.R5[Coll[(GroupElement, Coll[Byte])]].get
        }else{
-          const_initMembers.map{
-            (initMembers: (GroupElement, Coll[Byte])) => (proveDlog(initMembers._1), initMembers._2)
-          }
+          const_initMembers
        }
        val MINER_LIST = unzipMemberList(MEMBER_LIST)._1
 
@@ -72,10 +70,10 @@ object VotingContract {
 
 
        val ALL_VOTES_FROM_TX = INPUTS.filter{(box:Box) => blake2b256(box.propositionBytes) != const_metadataPropBytesHashed}
-       val SKIP_VOTES_FROM_TX = ALL_VOTES_FROM_TX.filter{(box:Box) => box.R4[SigmaProp].isDefined && box.R5[Coll[Byte]].isDefined}
-       val NORMAL_VOTES_FROM_TX = ALL_VOTES_FROM_TX.filter{(box:Box) => box.R4[Coll[(SigmaProp, Long)]].isDefined && box.R5[Coll[(SigmaProp, Coll[Byte])]].isDefined}
+       val SKIP_VOTES_FROM_TX = ALL_VOTES_FROM_TX.filter{(box:Box) => box.R4[GroupElement].isDefined && box.R5[Coll[Byte]].isDefined}
+       val NORMAL_VOTES_FROM_TX = ALL_VOTES_FROM_TX.filter{(box:Box) => box.R4[Coll[(SigmaProp, Long)]].isDefined && box.R5[Coll[(GroupElement, Coll[Byte])]].isDefined}
        // Votes From Tx that add or remove members. A member is some (SigmaProp, Coll[Byte]) that maps a PublicKey to a hashed worker name
-       val MEMBER_VOTES_FROM_TX = NORMAL_VOTES_FROM_TX.filter{(box:Box) => box.R9[(Coll[(SigmaProp, Coll[Byte])], Coll[(SigmaProp, Coll[Byte])])].isDefined}
+       val MEMBER_VOTES_FROM_TX = NORMAL_VOTES_FROM_TX.filter{(box:Box) => box.R9[(Coll[(GroupElement, Coll[Byte])], Coll[(GroupElement, Coll[Byte])])].isDefined}
 
        // ================= This area is for member consensus, determining which members must be added and removed by vote =================
 
@@ -83,15 +81,15 @@ object VotingContract {
        // Element 1 of the MemberPoll is the list of all members that the given vote wishes to add to this subpool,
        // Element 2 of the MemberPoll is the list of all members that the given vote wishes to remove from this subpool
        val getMemberPoll = {
-        (voteBox: Box) => voteBox.R9[(Coll[(SigmaProp, Coll[Byte])], Coll[(SigmaProp, Coll[Byte])])].get
+        (voteBox: Box) => voteBox.R9[(Coll[(GroupElement, Coll[Byte])], Coll[(GroupElement, Coll[Byte])])].get
        }
 
        val getAddedMembers = {
-        (memPoll: (Coll[(SigmaProp, Coll[Byte])], Coll[(SigmaProp, Coll[Byte])])) =>
+        (memPoll: (Coll[(GroupElement, Coll[Byte])], Coll[(GroupElement, Coll[Byte])])) =>
           memPoll._1
        }
        val getRemovedMembers = {
-        (memPoll: (Coll[(SigmaProp, Coll[Byte])], Coll[(SigmaProp, Coll[Byte])])) =>
+        (memPoll: (Coll[(GroupElement, Coll[Byte])], Coll[(GroupElement, Coll[Byte])])) =>
           memPoll._2
        }
 
@@ -100,34 +98,34 @@ object VotingContract {
        val removeInvalidMembers = {
         (box: Box) =>
           val filteredAdditions = getMemberPoll(box)._1.filter{
-            (memVote: (SigmaProp, Coll[Byte])) => !(MINER_LIST.exists{(pk: SigmaProp) => pk == memVote._1})
+            (memVote: (GroupElement, Coll[Byte])) => !(MINER_LIST.exists{(pk: GroupElement) => pk == memVote._1})
           }.filter{
-            (memVote: (SigmaProp, Coll[Byte])) => !(WORKER_LIST.exists{(worker: Coll[Byte]) => worker == memVote._2})
+            (memVote: (GroupElement, Coll[Byte])) => !(WORKER_LIST.exists{(worker: Coll[Byte]) => worker == memVote._2})
           }
           val filteredRemovals = getMemberPoll(box)._2.filter{
-            (memVote: (SigmaProp, Coll[Byte])) => MINER_LIST.exists{(pk: SigmaProp) => pk == memVote._1}
+            (memVote: (GroupElement, Coll[Byte])) => MINER_LIST.exists{(pk: GroupElement) => pk == memVote._1}
           }.filter{
-            (memVote: (SigmaProp, Coll[Byte])) => WORKER_LIST.exists{(worker: Coll[Byte]) => worker == memVote._2}
+            (memVote: (GroupElement, Coll[Byte])) => WORKER_LIST.exists{(worker: Coll[Byte]) => worker == memVote._2}
           }
           (filteredAdditions, filteredRemovals)
         }
 
 
       // List of all MemberPolls with invalid members removed.
-      val TOTAL_MEMPOLLS: Coll[(Coll[(SigmaProp, Coll[Byte])], Coll[(SigmaProp, Coll[Byte])])] = MEMBER_VOTES_FROM_TX.map(removeInvalidMembers)
+      val TOTAL_MEMPOLLS: Coll[(Coll[(GroupElement, Coll[Byte])], Coll[(GroupElement, Coll[Byte])])] = MEMBER_VOTES_FROM_TX.map(removeInvalidMembers)
       // Unflattened list of Memvotes
       val ADDITION_MEMVOTES = TOTAL_MEMPOLLS.map(getAddedMembers)
       val REMOVAL_MEMVOTES = TOTAL_MEMPOLLS.map(getRemovedMembers)
 
 
       val flattenMemvotes = {
-        (nestedMemvotes: Coll[Coll[(SigmaProp, Coll[Byte])]]) =>
+        (nestedMemvotes: Coll[Coll[(GroupElement, Coll[Byte])]]) =>
         val flatIndices = nestedMemvotes.flatMap{
-          (memVoteList: Coll[(SigmaProp, Coll[Byte])]) =>
+          (memVoteList: Coll[(GroupElement, Coll[Byte])]) =>
             memVoteList.indices
         }
         val sizeColl = nestedMemvotes.map{
-          (memVoteList: Coll[(SigmaProp, Coll[Byte])]) =>
+          (memVoteList: Coll[(GroupElement, Coll[Byte])]) =>
             memVoteList.size
         }
         // These indices represent index of parent collection. For example if we wished to access some element by doing
@@ -163,7 +161,7 @@ object VotingContract {
         }
         // This will create a Coll[(Int, Int)] such that each pair will represent some element of nestedCollection
         val originalIndices: Coll[(Int, Int)] = indicesFromRangeMap.zip(flatIndices)
-        val flattenedCollection: Coll[(SimgaProp, Coll[Byte])] = originalIndices.map{
+        val flattenedCollection: Coll[(GroupElement, Coll[Byte])] = originalIndices.map{
           (idxPair: (Int, Int)) =>
             nestedMemvotes(idxPair._1)(idxPair._2)
         }
@@ -171,7 +169,7 @@ object VotingContract {
       }
       // Returns distinct memvotes from list so that no memvotes repeat
       val distinctMemvotes = {
-        (memVoteColl: Coll[(SigmaProp, Coll[Byte])]) =>
+        (memVoteColl: Coll[(GroupElement, Coll[Byte])]) =>
         val memVoteIndices = memVoteColl.indices
         val distinctIndices = memVoteIndices.filter{
           (idx: Int) =>
@@ -187,7 +185,7 @@ object VotingContract {
         }
         uniqueColl
       }
-      val ALL_MEMVOTE_ADDITIONS: Coll[(SigmaProp, Coll[Byte])] = flattenMemvotes(ADDITION_MEMVOTES)
+      val ALL_MEMVOTE_ADDITIONS: Coll[(GroupElement, Coll[Byte])] = flattenMemvotes(ADDITION_MEMVOTES)
 
       // Flattened collection of all memVotes that attempt to remove from the subpool
       val ALL_MEMVOTE_REMOVALS = flattenMemvotes(REMOVAL_MEMVOTES)
@@ -196,18 +194,18 @@ object VotingContract {
       // Returns the number of times the given memVote appears in the given MemberList, essentially giving us a tally
       // for the number of people who voted for this member.
       val additionsTally: Int = {
-        (memVote: (SigmaProp, Coll[Byte])) =>
+        (memVote: (GroupElement, Coll[Byte])) =>
           val filterList = ALL_MEMVOTE_ADDITIONS.filter{
-            (otherMemVote: (SigmaProp, Coll[Byte])) =>
+            (otherMemVote: (GroupElement, Coll[Byte])) =>
               memVote == otherMemVote
           }
           val tally = filterList.size
           tally
       }
       val removalsTally: Int = {
-        (memVote: (SigmaProp, Coll[Byte])) =>
+        (memVote: (GroupElement, Coll[Byte])) =>
           val filterList = ALL_MEMVOTE_REMOVALS.filter{
-            (otherMemVote: (SigmaProp, Coll[Byte])) =>
+            (otherMemVote: (GroupElement, Coll[Byte])) =>
               memVote == otherMemVote
           }
           val tally = filterList.size
@@ -216,7 +214,7 @@ object VotingContract {
 
       // Returns true if this memVote has a majority in the addition list, false if not
       val addVoteHasMajority = {
-        (memVote: (SigmaProp, Coll[Byte])) =>
+        (memVote: (GroupElement, Coll[Byte])) =>
           if(additionsTally(memVote) > (MINER_LIST.size / 2)){
             true
           }else{
@@ -225,7 +223,7 @@ object VotingContract {
       }
       // Returns true if this memVote has a majority in the removals list, false if not
       val remVoteHasMajority = {
-        (memVote: (SigmaProp, Coll[Byte])) =>
+        (memVote: (GroupElement, Coll[Byte])) =>
           if(removalsTally(memVote) > (MINER_LIST.size / 2)){
             true
           }else{
@@ -236,10 +234,10 @@ object VotingContract {
       // These lists represent all the addition and removal memVotes that were voted on by a
       // a majority of the subpool. Contains duplicate values.
       val SUBPOOL_ADDITIONS = ALL_MEMVOTE_ADDITIONS.filter{
-        (memVote: (SigmaProp, Coll[Byte])) => addVoteHasMajority(memVote)
+        (memVote: (GroupElement, Coll[Byte])) => addVoteHasMajority(memVote)
       }
       val SUBPOOL_REMOVALS = ALL_MEMVOTE_REMOVALS.filter{
-        (memVote: (SigmaProp, Coll[Byte])) => remVoteHasMajority(memVote)
+        (memVote: (GroupElement, Coll[Byte])) => remVoteHasMajority(memVote)
       }
       // Additions list folded so that duplicate values are removed.
       val UNIQUE_ADDITIONS = distinctMemvotes(SUBPOOL_ADDITIONS)
@@ -251,9 +249,9 @@ object VotingContract {
       val MEMBER_CONSENSUS =
         if(SKIP_VOTES_FROM_TX.size <= NORMAL_VOTES_FROM_TX.size){
           MEMBER_LIST.filter{
-            (member: (SigmaProp, Coll[Byte])) =>
+            (member: (GroupElement, Coll[Byte])) =>
               !(SUBPOOL_REMOVALS.exists{
-                (memVote: (SigmaProp, Coll[Byte])) =>
+                (memVote: (GroupElement, Coll[Byte])) =>
                   memVote == member
             })
           }.append(UNIQUE_ADDITIONS)
@@ -263,7 +261,7 @@ object VotingContract {
 
       // ================= This area is for value consensus, which determines the correct shares and values for each miner =================
        val VOTES_VALID = allOf(Coll(
-          NORMAL_VOTES_FROM_TX.forall{(box: Box) => box.R6[SigmaProp].isDefined && box.R7[Coll[Byte]].isDefined},
+          NORMAL_VOTES_FROM_TX.forall{(box: Box) => box.R6[GroupElement].isDefined && box.R7[Coll[Byte]].isDefined},
           SKIP_VOTES_FROM_TX.forall{(box: Box) => box.R5[Coll[Byte]].get == const_metadataPropBytesHashed},
           NORMAL_VOTES_FROM_TX.forall{(box: Box) => box.R7[Coll[Byte]].get == const_metadataPropBytesHashed},
           ALL_VOTES_FROM_TX.forall{(box: Box) => box.value == SELF.value},
@@ -272,12 +270,7 @@ object VotingContract {
 
        val voteSignersAreUnique = {
         (pkList: Coll[SigmaProp]) => pkList.forall{
-         (pk: SigmaProp) => NORMAL_VOTES_FROM_TX.filter{(box: Box) => box.R6[SigmaProp].get == pk}.size == 1
-        }
-       }
-       val workerListsAreSame = {
-        (workerList: Coll[Coll[Byte]]) => ALL_VOTES_FROM_TX.forall{
-          (box: Box) => box.R5[Coll[Coll[Byte]]].get == workerList
+         (pk: SigmaProp) => NORMAL_VOTES_FROM_TX.filter{(box: Box) => proveDlog(box.R6[GroupElement].get) == pk}.size == 1
         }
        }
        val buildVoterPoolState = {
@@ -336,14 +329,18 @@ object VotingContract {
        }
        val VALUE_CONSENSUS =
         if(SKIP_VOTES_FROM_TX.size <= NORMAL_VOTES_FROM_TX.size){
-          valueConsensusFromPKList(MINER_LIST)
+          valueConsensusFromPKList(
+            MINER_LIST.map{
+              (ge: GroupElement) => proveDlog(ge)
+            }
+          )
         }else{
           if(METADATA_VALID){
             METADATA_BOX.R4[Coll[(SigmaProp, Long)]].get
           }else{
             // Metadata box isnt defined, and there are more skip votes than real votes so we will make a consensus
             // from 0.
-            val newConsensus = MINER_LIST.map{(pk:SigmaProp) => (pk, 0L)}
+            val newConsensus = MINER_LIST.map{(ge:GroupElement) => (proveDlog(ge), 0L)}
             newConsensus
           }
         }
@@ -372,7 +369,8 @@ object VotingContract {
        }
        val outputsFollowConsensus = NORMAL_VOTES_FROM_TX.forall{
         (voteBox: Box) => OUTPUTS.exists{
-            (box: Box) => getValueFromSharesConsensus(voteBox.R6[SigmaProp].get) == box.value && box.propositionBytes == voteBox.R6[SigmaProp].get.propBytes
+            (box: Box) =>
+              getValueFromSharesConsensus(proveDlog(voteBox.R6[GroupElement].get)) == box.value && box.propositionBytes == proveDlog(voteBox.R6[GroupElement].get).propBytes
           }
         }
         val skipsValid = SKIP_VOTES_FROM_TX.forall{
@@ -380,7 +378,7 @@ object VotingContract {
             (box: Box) =>
             if(SKIP_PROTOCOL <= 0){
               // Skip protocol less than 1, so handle skip values like normal votes using the consensus
-              getValueFromSharesConsensus(skipBox.R4[SigmaProp].get) == box.value && box.propositionBytes == skipBox.R4[SigmaProp].get.propBytes
+              getValueFromSharesConsensus(proveDlog(skipBox.R4[GroupElement].get)) == box.value && box.propositionBytes == proveDlog(skipBox.R4[GroupElement].get).propBytes
             }else{
               // Skip protocol is >= 1, so skip values are sent back to holding box.
               // Holding box must have same hashed bytes as bytes in R6.
@@ -394,7 +392,7 @@ object VotingContract {
             (box: Box) =>
             if(SKIP_PROTOCOL <= 0){
               // Skip protocol less than 1, so handle skip values like normal votes using the consensus
-              getValueFromSharesConsensus(voteBox.R6[SigmaProp].get) == box.value && box.propositionBytes == voteBox.R6[SigmaProp].get.propBytes
+              getValueFromSharesConsensus(proveDlog(voteBox.R6[GroupElement].get)) == box.value && box.propositionBytes == proveDlog(voteBox.R6[GroupElement].get).propBytes
             }else{
               // Skip protocol is >= 1, so skip values are sent back to holding box.
               // Holding box must have same hashed bytes as bytes in R6.
@@ -456,15 +454,15 @@ object VotingContract {
         val valueConsensusWithRemovals = VALUE_CONSENSUS.filter{
           (consVal: (SigmaProp, Long)) =>
             !(SUBPOOL_REMOVALS.exists{
-              (member: (SigmaProp, Coll[Byte])) =>
-                member._1 == consVal._1
+              (member: (GroupElement, Coll[Byte])) =>
+                proveDlog(member._1) == consVal._1
             })
         }
         // Add new public keys to the value consensus with a share number of 0.
         // Ensures skip votes work properly when using last consensus.
         val newMembersConsensus = UNIQUE_ADDITIONS.map{
-          (member: (SigmaProp, Coll[Byte])) =>
-            (member._1, 0L)
+          (member: (GroupElement, Coll[Byte])) =>
+            (proveDlog(member._1), 0L)
         }
         // Modified value consensus for metadata box
         val METADATA_VALUE_CONSENSUS = valueConsensusWithRemovals.append(newMembersConsensus)
@@ -477,7 +475,7 @@ object VotingContract {
                 allOf(Coll(
                   box.value == const_MinTxFee,
                   box.R4[Coll[(SigmaProp, Long)]].get == METADATA_VALUE_CONSENSUS,
-                  box.R5[Coll[(SigmaProp, Coll[Byte])]].get == MEMBER_CONSENSUS,
+                  box.R5[Coll[(GroupElement, Coll[Byte])]].get == MEMBER_CONSENSUS,
                   box.R6[Coll[Int]].get == VOTING_CONSENSUS,
                   box.R7[Int].get == HEIGHT,
                   box.R8[Int].get == 0,
@@ -492,7 +490,7 @@ object VotingContract {
                 allOf(Coll(
                   box.value == const_MinTxFee,
                   box.R4[Coll[(SigmaProp, Long)]].get == METADATA_VALUE_CONSENSUS,
-                  box.R5[Coll[(SigmaProp, Coll[Byte])]].get == MEMBER_CONSENSUS,
+                  box.R5[Coll[(GroupElement, Coll[Byte])]].get == MEMBER_CONSENSUS,
                   box.R6[Coll[Int]].get == VOTING_CONSENSUS,
                   box.R7[Int].get == HEIGHT,
                   box.R8[Int].get == METADATA_BOX.R8[Int].get + 1,
@@ -502,7 +500,7 @@ object VotingContract {
             }
           }
         // Any miner in the member list may sign this transaction, so long as outputs and metadata are valid
-        atLeast(1, MINER_LIST) && sigmaProp(outputsValid && metadataOutputValid)
+        atLeast(1, MINER_LIST.map{(ge:GroupElement) => proveDlog(ge)}) && sigmaProp(outputsValid && metadataOutputValid)
        }
       """.stripMargin
     script
@@ -656,7 +654,7 @@ object VotingContract {
       (memVote: (SigmaProp, Array[Byte])) => memVoteHasMajority(memVote, ALL_MEMVOTE_REMOVALS)
     }
     // Additions list folded so that duplicate values are removed.
-    val UNIQUE_ADDITIONS = SUBPOOL_ADDITIONS.foldLeft(List(SUBPOOL_ADDITIONS(0))){
+    val UNIQUE_ADDITIONS = SUBPOOL_ADDITIONS.foldLeft(List[(SigmaProp, Array[Byte])]()){
       (memVoteAccum: List[(SigmaProp, Array[Byte])], memVote: (SigmaProp, Array[Byte])) =>
         if (!memVoteAccum.contains(memVote)) {
           memVoteAccum.++(List(memVote))
@@ -712,7 +710,7 @@ object VotingContract {
     // Avg total shares from list of voter pool states
     val AVG_TOTAL_SHARES = VOTER_POOL_STATES.map(buildTotalShares).foldLeft(0L){
       (accum: Long, shareTotal: Long) => accum + shareTotal
-    } / VOTER_POOL_STATES.size
+    } / MINER_LIST.size // TODO CHANGE THIS LATER
 
     // Calculate box value from share using constants.
     def getBoxValue(shareNum: Long) : Long = {
@@ -894,7 +892,7 @@ object VotingContract {
 
   def findValidInputBoxes(ctx: BlockchainContext, minerList: List[Address], inputBoxes:List[InputBox]): List[InputBox] = {
     minerList.map{(addr: Address) => inputBoxes.filter {
-      (box: InputBox) => genSigProp(addr) == box.getRegisters.get(2).getValue.asInstanceOf[SigmaProp]}.head
+      (box: InputBox) => addr.getPublicKeyGE == box.getRegisters.get(2).getValue.asInstanceOf[GroupElement]}.head
     }
 
   }

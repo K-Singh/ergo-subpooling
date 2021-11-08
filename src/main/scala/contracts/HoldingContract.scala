@@ -92,21 +92,17 @@ object HoldingContract {
     {
        val INITIATION_ENDED = HEIGHT > const_initiationEndingHeight
 
-       // Check if first vote sent
-       val VOTING_STARTED = SELF.R4[Long].isDefined && SELF.R5[Coll[GroupElement]].isDefined && SELF.R6[Int].isDefined
        val TOTAL_INPUTS_VALUE = INPUTS.fold(0L, {(accum: Long, box: Box) => accum + box.value})
-       val INITIAL_MEMBERS = const_initMembers.map{
-            (initMembers: (GroupElement, Coll[Byte])) => (proveDlog(initMembers._1), initMembers._2)
-          }
-       // Unzips list of members(tuples of type (SigmaProp, Coll[Byte]]) into tuple of type (Coll[SigmaProp], Coll[Coll[Byte]])
+       val INITIAL_MEMBERS = const_initMembers
+       // Unzips list of members(tuples of type (GroupElement, Coll[Byte]]) into tuple of type (Coll[GroupElement], Coll[Coll[Byte]])
        val unzipMemberList = {
-        (memberMap: Coll[(SigmaProp, Coll[Byte])]) =>
+        (memberMap: Coll[(GroupElement, Coll[Byte])]) =>
           (memberMap.map{
-            (memVote: (SigmaProp, Coll[Byte])) =>
+            (memVote: (GroupElement, Coll[Byte])) =>
               memVote._1
           },
           memberMap.map{
-            (memVote: (SigmaProp, Coll[Byte])) =>
+            (memVote: (GroupElement, Coll[Byte])) =>
               memVote._2
           })
        }
@@ -132,20 +128,34 @@ object HoldingContract {
        }else{
         const_maxVotingHeight
        }
+
+       // Checks to see if voting has started i.e this box is a redeposit box
+       val VOTING_STARTED = allOf(Coll(
+        SELF.R4[Long].isDefined,
+        SELF.R5[Coll[GroupElement]].isDefined,
+        SELF.R6[Int].isDefined,
+        INPUTS.size == 1
+       ))
        // Represents evenly divided value of inputs as value of voting box
        val votingValue: Long = {
          if(METADATA_VALID){
           (TOTAL_INPUTS_VALUE / METADATA_BOX.R4[Coll[(SigmaProp, Long)]].get.size) - const_MinTxFee
          }else{
-          // If MetaData Box isn't defined, we are still in Initiation. Initial address size value is used instead.
-          (TOTAL_INPUTS_VALUE / INITIAL_MINERS.size) - const_MinTxFee
+          // If MetaData Box isn't defined, we are still in Initiation. Check if voting started to see if we
+          // can get voting value from SELF.R4. If not return 0, which should cause script to be proven false
+          if(VOTING_STARTED){
+            SELF.R4[Long].getOrElse(0L)
+          }else{
+            // Initiation and voting hasn't started, so calculate using INITIAL_MINERS size
+            (TOTAL_INPUTS_VALUE / INITIAL_MINERS.size) - const_MinTxFee
+          }
          }
        }
 
        val VOTE_EXISTS = allOf(Coll(
           OUTPUTS(0).R4[Coll[(SigmaProp, Long)]].isDefined,
-          OUTPUTS(0).R5[Coll[(SigmaProp, Coll[Byte])]].isDefined,
-          OUTPUTS(0).R6[SigmaProp].isDefined,
+          OUTPUTS(0).R5[Coll[(GroupElement, Coll[Byte])]].isDefined,
+          OUTPUTS(0).R6[GroupElement].isDefined,
           OUTPUTS(0).R7[Coll[Byte]].isDefined,
           OUTPUTS(0).R7[Coll[Byte]].get == const_metadataPropBytesHashed,
           OUTPUTS(0).R8[Coll[Int]].isDefined,
@@ -155,22 +165,23 @@ object HoldingContract {
         ))
        val REDEPOSIT_EXISTS = allOf(Coll(
         OUTPUTS.size == 3,
-        INPUTS.size == 1,
         OUTPUTS(1).propositionBytes == SELF.propositionBytes,
         OUTPUTS(1).value == TOTAL_INPUTS_VALUE - votingValue - const_MinTxFee,
-        OUTPUTS(1).R4[Long].isDefined && OUTPUTS(1).R4[Long].get == votingValue,
+        OUTPUTS(1).R4[Long].isDefined && OUTPUTS(1).R4[Long].getOrElse(0L) == votingValue,
         OUTPUTS(1).R5[Coll[GroupElement]].isDefined,
-        OUTPUTS(1).R6[Int].isDefined && (OUTPUTS(1).R6[Int].get == HEIGHT || OUTPUTS(1).R6[Int].get == SELF.R6[Int].getOrElse(0))
+        OUTPUTS(1).R6[Int].isDefined && (OUTPUTS(1).R6[Int].getOrElse(HEIGHT+5) <= HEIGHT || OUTPUTS(1).R6[Int].getOrElse(1) == SELF.R6[Int].getOrElse(0))
        ))
+
+
        // Checks if members of pk collection are not in redeposit box's R5
        // Essentially proves that the set of GE's in pkList is mutually exclusive from the set of GE's in OUTPUTS(1).R5[Coll[GroupElement]]
        val redepositValid = {
-        (pkList: Coll[SigmaProp]) =>
+        (geList: Coll[GroupElement]) =>
           if(REDEPOSIT_EXISTS){
-            pkList.forall{
-              (pk: SigmaProp) => OUTPUTS(1).R5[Coll[GroupElement]].get.forall{
-                (signerGE: GroupElement) => proveDlog(signerGE) != pk
-              }
+            geList.forall{
+              (ge: GroupElement) => !(OUTPUTS(1).R5[Coll[GroupElement]].getOrElse(Coll[GroupElement]()).exists{
+                (signerGE: GroupElement) => signerGE == ge
+              })
             }
           }else{
             false
@@ -182,7 +193,7 @@ object HoldingContract {
           allOf(Coll(
           box.value == votingValue,
           blake2b256(box.propositionBytes) == const_consensusPropBytesHashed,
-          box.R4[SigmaProp].isDefined,
+          box.R4[GroupElement].isDefined,
           box.R5[Coll[Byte]].isDefined,
           box.R6[Coll[Byte]].isDefined,
           // box.R5[Coll[Byte]].get == const_metadataPropBytesHashed
@@ -198,17 +209,22 @@ object HoldingContract {
         (pkList: Coll[SigmaProp]) => pkList.forall(isKeyInPoolState)
        }
        val membersValid = {
-        (memberList: Coll[(SigmaProp, Coll[Byte])]) =>
-          OUTPUTS(0).R5[Coll[(SigmaProp, Coll[Byte])]].get == memberList
-       }
-       val signatureStored = {
-        (pk: SigmaProp) =>
-          if(OUTPUTS(0).R6[SigmaProp].isDefined){
-            pk == OUTPUTS(0).R6[SigmaProp].get
-          }else{
-            false
+        (memberList: Coll[(GroupElement, Coll[Byte])]) =>
+          OUTPUTS(0).R5[Coll[(GroupElement, Coll[Byte])]].get.forall{
+            (outputMember: (GroupElement, Coll[Byte])) =>
+              memberList.exists{
+                (member: (GroupElement, Coll[Byte])) =>
+                  member._1 == outputMember._1 && member._2 == outputMember._2
+              }
           }
        }
+       val signatureStored =
+          if(OUTPUTS(0).R6[GroupElement].isDefined){
+             proveDlog(OUTPUTS(0).R6[GroupElement].get)
+          }else{
+            sigmaProp(false)
+          }
+
        val signerInSubPool = {
         (pkList: Coll[SigmaProp]) => atLeast(1, pkList)
        }
@@ -216,104 +232,143 @@ object HoldingContract {
        // First voter spending path
        // Ensures creation of voting box, and redeposit holding box with properly set values
        val constructSpendingPath1 = {
-        (memberList: Coll[(SigmaProp, Coll[Byte])]) =>
-         val pkList = unzipMemberList(memberList)._1
-         val signerPK = atLeast(1, pkList)
-         val filteredPKs = pkList.filter{
-            (pk: SigmaProp) => pk != signerPK
-          }
-         val boolCheck = allOf(Coll(
-              VOTE_EXISTS,
-              REDEPOSIT_EXISTS,
-              poolStateValid(pkList),
-              // membersValid(memberList),
-              // redepositValid(filteredPKs),
-              signatureStored(signerPK)
-            ))
+        (memberList: Coll[(GroupElement, Coll[Byte])]) =>
+         if(VOTE_EXISTS && REDEPOSIT_EXISTS && !VOTING_STARTED){
+           val geList = unzipMemberList(memberList)._1
+           val pkList = geList.map{
+            (ge: GroupElement) => proveDlog(ge)
+           }
+           val signerPK = atLeast(1, pkList)
+           val signerGE = OUTPUTS(0).R6[GroupElement].get
+           val filteredGEs = geList.filter{
+              (ge: GroupElement) => ge != signerGE
+           }
+           val filteredPKs = pkList.filter{
+              (pk: SigmaProp) => pk != signerPK
+            }
+           val boolCheck = allOf(Coll(
+                VOTE_EXISTS, // Not issue
+                REDEPOSIT_EXISTS, // Not issue
+                poolStateValid(pkList), // Not issue
+                membersValid(memberList),
+                redepositValid(filteredGEs),
 
-            sigmaProp(boolCheck) && signerInSubPool(pkList)
+              ))
+
+           sigmaProp(boolCheck) && signerInSubPool(pkList) && signatureStored
+         }else{
+            sigmaProp(false)
+         }
        }
        // Voting has initiated, so SELF has registers.
        // In 2a, these registers build a voting box and redeposit holding box with updated values
        val constructSpendingPath2a = {
-        (memberList: Coll[(SigmaProp, Coll[Byte])]) =>
-         val pkList = unzipMemberList(memberList)._1
-         val filteredPKs = pkList.filter{
-            (pk: SigmaProp) =>
-              if(VOTING_STARTED){
-                !(SELF.R5[Coll[GroupElement]].get.exists{
-                  (signerGE: GroupElement) =>
-                    pk == proveDlog(signerGE)
-                  }
-                 )
-              }else{
-                 true
-              }
-          }
-         val signerPK = atLeast(1, filteredPKs)
-         val newFilteredPKs = filteredPKs.filter{
-            (pk: SigmaProp) => pk != signerPK
+        (memberList: Coll[(GroupElement, Coll[Byte])]) =>
+         if(VOTE_EXISTS && REDEPOSIT_EXISTS && VOTING_STARTED){
+           val geList = unzipMemberList(memberList)._1
+           val pkList = geList.map{
+            (ge: GroupElement) => proveDlog(ge)
+           }
+           val filteredGEs = geList.filter{
+              (pk: GroupElement) =>
+                if(SELF.R5[Coll[GroupElement]].isDefined){
+                  !(SELF.R5[Coll[GroupElement]].getOrElse(Coll[GroupElement]()).exists{
+                    (signerGE: GroupElement) =>
+                      pk == signerGE
+                    }
+                   )
+                }else{
+                   true
+                }
+            }
+           val filteredPKs = filteredGEs.map{
+            (ge: GroupElement) => proveDlog(ge)
+           }
+           val signerGE = OUTPUTS(0).R6[GroupElement].get
+           val signerPK = atLeast(1, filteredPKs)
+           val newFilteredPKs = filteredPKs.filter{
+              (pk: SigmaProp) => pk != signerPK
+           }
+           val newFilteredGEs = filteredGEs.filter{
+              (ge: GroupElement) => ge == signerGE
+           }
+           val boolCheck = allOf(Coll(
+             VOTE_EXISTS,
+             REDEPOSIT_EXISTS,
+             poolStateValid(filteredPKs),
+             membersValid(memberList)
+           ))
+           sigmaProp(boolCheck && redepositValid(newFilteredGEs)) && signerInSubPool(filteredPKs) && signatureStored
+         }else{
+           sigmaProp(false)
          }
-         val boolCheck = allOf(Coll(
-           VOTE_EXISTS,
-           REDEPOSIT_EXISTS,
-           poolStateValid(filteredPKs),
-           membersValid(memberList)
-         ))
-         sigmaProp(boolCheck && redepositValid(newFilteredPKs) && signatureStored(signerPK)) && signerInSubPool(filteredPKs)
        }
        // In 2b, the last miner has sent their voting box, so no redeposit box is needed.
        val constructSpendingPath2b = {
-        (memberList: Coll[(SigmaProp, Coll[Byte])]) =>
-          val pkList = unzipMemberList(memberList)._1
-          val filteredPKs = pkList.filter{
-            (pk: SigmaProp) =>
-              if(VOTING_STARTED){
-                !(SELF.R5[Coll[GroupElement]].get.exists{
-                  (signerGE: GroupElement) =>
-                    pk == proveDlog(signerGE)
-                  }
-                 )
-              }else{
-                 true
-              }
+        (memberList: Coll[(GroupElement, Coll[Byte])]) =>
+          if(VOTE_EXISTS && VOTING_STARTED && !REDEPOSIT_EXISTS){
+            val geList = unzipMemberList(memberList)._1
+            val pkList = geList.map{
+             (ge: GroupElement) => proveDlog(ge)
+            }
+            val filteredGEs = geList.filter{
+               (pk: GroupElement) =>
+                 if(SELF.R5[Coll[GroupElement]].isDefined){
+                   !(SELF.R5[Coll[GroupElement]].getOrElse(Coll[GroupElement]()).exists{
+                     (signerGE: GroupElement) =>
+                       pk == signerGE
+                     }
+                    )
+                 }else{
+                    true
+                 }
+             }
+          val filteredPKs = filteredGEs.map{
+            (ge: GroupElement) => proveDlog(ge)
           }
-        val signerPK = atLeast(1, filteredPKs)
-        val boolCheck = allOf(Coll(
-           VOTE_EXISTS,
-           poolStateValid(filteredPKs),
-           membersValid(memberList)
-         ))
+          val signerGE = OUTPUTS(0).R6[GroupElement].get
+          val signerPK = atLeast(1, filteredPKs)
+          val boolCheck = allOf(Coll(
+             VOTE_EXISTS,
+             poolStateValid(filteredPKs),
+             membersValid(memberList)
+           ))
 
-         sigmaProp(boolCheck && signatureStored(signerPK)) && signerInSubPool(filteredPKs)
+           sigmaProp(boolCheck) && signerInSubPool(filteredPKs) && signatureStored
+        }else{
+           sigmaProp(false)
+        }
        }
        // In 3, HEIGHT > MAX_VOTING_HEIGHT, so skip-vote boxes can be made for any miner
        val constructSpendingPath3 = {
-        (memberList: Coll[(SigmaProp, Coll[Byte])]) =>
-        val pkList = unzipMemberList(memberList)._1
-        val filteredPKs = pkList.filter{
-            (pk: SigmaProp) =>
-              if(VOTING_STARTED){
-                !(SELF.R5[Coll[GroupElement]].get.exists{
-                  (signerGE: GroupElement) =>
-                    pk == proveDlog(signerGE)
-                  }
-                 )
-              }else{
-                 true
-              }
+        (memberList: Coll[(GroupElement, Coll[Byte])]) =>
+          val geList = unzipMemberList(memberList)._1
+          val pkList = geList.map{
+           (ge: GroupElement) => proveDlog(ge)
           }
+          val filteredPKs = pkList.filter{
+              (pk: SigmaProp) =>
+                if(SELF.R5[Coll[GroupElement]].isDefined){
+                  !(SELF.R5[Coll[GroupElement]].get.exists{
+                    (signerGE: GroupElement) =>
+                      pk == proveDlog(signerGE)
+                    }
+                   )
+                }else{
+                   true
+                }
+            }
 
-        val boolCheck = allOf(Coll(
-           filteredPKs.forall{(pk: SigmaProp) => OUTPUTS.exists{(box: Box) => isBoxSkip(box) && box.R4[SigmaProp].get == pk}}
-         ))
-         // Check only that skip vote boxes have been properly made and that signer is part of original pkList
-         sigmaProp(boolCheck) && signerInSubPool(pkList)
+          val boolCheck = allOf(Coll(
+             filteredPKs.forall{(pk: SigmaProp) => OUTPUTS.exists{(box: Box) => isBoxSkip(box) && proveDlog(box.R4[GroupElement].get) == pk}}
+           ))
+           // Check only that skip vote boxes have been properly made and that signer is part of original pkList
+           sigmaProp(boolCheck) && signerInSubPool(pkList)
        }
 
        // Constructs main spending paths together by inputting parameters, used to separate Initiation and Standard operation.
        val constructSpendingBranch = {
-       (memberList: Coll[(SigmaProp, Coll[Byte])]) =>
+       (memberList: Coll[(GroupElement, Coll[Byte])]) =>
 
         // Checks if Holding Box Regs defined, indicates voting has begun.
          if(!VOTING_STARTED && HEIGHT < MAX_VOTING_HEIGHT){
@@ -325,7 +380,7 @@ object HoldingContract {
          }else if(VOTING_STARTED && HEIGHT < MAX_VOTING_HEIGHT){
 
             // Checks to see if this is not the last vote, meaning that redeposit is needed
-            if(SELF.value != SELF.R4[Long].get){
+            if(SELF.value != SELF.R4[Long].get + const_MinTxFee){
               constructSpendingPath2a(memberList)
             }else{
               // Last vote, so redeposit is not needed.
@@ -343,11 +398,30 @@ object HoldingContract {
        // This constructs the final SigmaProp that determines whether or not the transaction is valid
        // Uses two spending branches to indicate difference between initiation and standard operation
        if(!INITIATION_ENDED){
-          constructSpendingPath1(INITIAL_MEMBERS)
+          // constructSpendingBranch(INITIAL_MEMBERS)
+          if(!VOTING_STARTED && HEIGHT < MAX_VOTING_HEIGHT){
+           // This must be the first vote during the initiation phase. Therefore we use hard coded member list.
+             constructSpendingPath1(INITIAL_MEMBERS)
+
+           // Not the first vote, but voting is still allowed. We may access the registers of SELF now to get information about this voting transaction.
+          }else if(VOTING_STARTED && HEIGHT < MAX_VOTING_HEIGHT){
+             // Checks to see if this is not the last vote, meaning that redeposit is needed
+             if(SELF.value != SELF.R4[Long].get + const_MinTxFee){
+               constructSpendingPath2a(INITIAL_MEMBERS)
+             }else{
+               // Last vote, so redeposit is not needed.
+               constructSpendingPath2b(INITIAL_MEMBERS)
+             }
+          }else{
+             sigmaProp(false)
+          }
        }else if(METADATA_VALID){
+
+
+
           // R5 of MetaDataBox holds collection of members in this subpool
           // Might have to change registers of metadatabox and holding box to support members.
-          val SUBPOOL_MEMBERS = METADATA_BOX.R5[Coll[(SigmaProp, Coll[Byte])]].get
+          //val SUBPOOL_MEMBERS = METADATA_BOX.R5[Coll[(GroupElement, Coll[Byte])]].get
           // constructSpendingBranch(SUBPOOL_MEMBERS)
 
           constructSpendingPath1(INITIAL_MEMBERS)
@@ -409,28 +483,36 @@ object HoldingContract {
    * @param holdingBoxes Array of input boxes from holding address
    * @param votingValue Value of vote boxes
    * @param signerAddress Signer address of transaction
+   * @param minerList Array of miner addresses
    * @param holdingAddress Holding address
    */
-  def generateRedepositHoldingBoxes(ctx: BlockchainContext, holdingBoxes: List[InputBox], votingValue: Long,
-                                    signerAddress: Address, holdingAddress: Address): ListBuffer[OutBox] = {
+  def generateRedepositHoldingBoxes(ctx: BlockchainContext, holdingBoxes: List[InputBox], signerAddress: Address,
+                                    minerList: Array[Address], holdingAddress: Address): ListBuffer[OutBox] = {
     // First box in list, possibly a redeposit box
     val holdingBoxHead = holdingBoxes.head
     val totalValue = holdingBoxes.foldLeft(0L){(accum: Long, box: InputBox) => accum + box.getValue}
-    ProveDlog
+    val votingValue = getVotingValue(totalValue, minerList.length)
     val signerAddressList: List[GroupElement] = List(signerAddress.getPublicKeyGE)
+    val signerAddressColl = newColl(signerAddressList, ErgoType.groupElementType())
     val outBoxList: ListBuffer[OutBox] = ListBuffer.empty[OutBox]
     // If holding box head contains registers, then must be from another redeposit holding box. Therefore values can
     // be obtained from its registers.
     if(holdingBoxes.length == 1 && isRedepositBox(holdingBoxHead)){
       val storedVotingValue = holdingBoxHead.getRegisters.get(0).getValue.asInstanceOf[Long]
-      val voterList: List[GroupElement] = holdingBoxHead.getRegisters.get(1).getValue.asInstanceOf[List[GroupElement]]
+      val voterList: Coll[GroupElement] = holdingBoxHead.getRegisters.get(1).getValue.asInstanceOf[Coll[GroupElement]]
       val votingStartedHeight = holdingBoxHead.getRegisters.get(2).getValue.asInstanceOf[Int]
-      val newVoterList: List[GroupElement] = voterList.++(signerAddressList)
-      val newVoterListAsColl = newColl(newVoterList, ErgoType.groupElementType())
+      val newVoterList: Coll[GroupElement] = voterList.append(signerAddressColl)
+      if(storedVotingValue == holdingBoxHead.getValue - Parameters.MinFee){
+        println("Last Member Is Putting In Vote, No Redeposit Needed!")
+        return outBoxList
+      }
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-
+      println("===========Generating Next Redeposit Box=============")
+      println("redepositValue: "+ (totalValue - votingValue - Parameters.MinFee))
+      println("newVoterListAsColl: " + newVoterList)
+      println("HEIGHT: "+ ctx.getHeight)
       val ergoVal1 = ErgoValue.of(storedVotingValue)
-      val ergoVal2 = ErgoValue.of(newVoterListAsColl, ErgoType.groupElementType())
+      val ergoVal2 = ErgoValue.of(newVoterList, ErgoType.groupElementType())
       val ergoVal3 = ErgoValue.of(votingStartedHeight)
       val regValueList: Array[ErgoValue[_]] = Array(ergoVal1, ergoVal2, ergoVal3)
       outBoxList.append(
@@ -447,7 +529,7 @@ object HoldingContract {
       println(votingValue)
       signerAddressAsColl.map(println)
       println(ctx.getHeight)
-      println("===========Generating Redeposit Box=============")
+      println("===========Generating Initial Redeposit Box=============")
       println("redepositValue: "+ (totalValue - votingValue - Parameters.MinFee))
       println("signerAddressColl: " + signerAddressAsColl)
       println("HEIGHT: "+ ctx.getHeight)
@@ -476,28 +558,37 @@ object HoldingContract {
    * @param metadataAddress Metadata address for subpool
    * @return Returns list voting boxes
    */
-  def generateVotingBoxes(ctx: BlockchainContext, minerList: Array[Address], minerShares: Array[Long], workerList: Array[String],
-                                 votingValue: Long, signerAddress: Address, voteList: Array[Int], metadataAddress: Address, consensusAddress: Address): ListBuffer[OutBox] = {
+  def generateVotingBoxes(ctx: BlockchainContext, holdingBoxes: List[InputBox], minerList: Array[Address], minerShares: Array[Long], workerList: Array[String],
+                          signerAddress: Address, voteList: Array[Int], metadataAddress: Address, consensusAddress: Address): ListBuffer[OutBox] = {
     val outBoxList: ListBuffer[OutBox] = ListBuffer.empty[OutBox]
 
+    val holdingBoxHead = holdingBoxes.head
+    val totalValue = holdingBoxes.foldLeft(0L){(accum: Long, box: InputBox) => accum + box.getValue}
+    var votingValue = getVotingValue(totalValue, minerList.length)
+
+    if(holdingBoxHead.getRegisters.size() > 0 && holdingBoxHead.getRegisters.get(0).getType == ErgoType.longType()){
+      votingValue = holdingBoxHead.getRegisters.get(0).getValue.asInstanceOf[Long]
+    }
+
+    val geList = minerList.map((addr: Address) => addr.getPublicKeyGE)
     val sigList = minerList.map(genSigProp)
     val keysToSharesTupleMap: Array[(SigmaProp,Long)] = sigList.zip(minerShares)
     val poolStateCollection: Coll[(SigmaProp, Long)] = newColl(keysToSharesTupleMap, SpType.POOL_VAL_TYPE)
     val workerListHashed = workerList.map{(str: String) => Blake2b256(str)}.map{(byteArray: Array[Byte]) => newColl(byteArray, ErgoType.byteType())}
     val workerBytesCollection: Coll[Coll[Byte]] = newColl(workerListHashed, SpType.STRING_TYPE)
-    val sigColl = newColl(sigList, ErgoType.sigmaPropType())
+    val geColl = newColl(geList, ErgoType.groupElementType())
     val votingColl = newColl(voteList, ErgoType.integerType())
-    val memberColl = sigColl.zip(workerBytesCollection)
+    val memberColl = geColl.zip(workerBytesCollection)
     val metadataBytesHashed = newColl(Blake2b256(metadataAddress.getErgoAddress.script.bytes), ErgoType.byteType())
     println("===========Generating Voting Boxes=============")
     println("poolState: "+ poolStateCollection)
     println("memberColl: " + memberColl)
-    println("signer: "+ signerAddress.getPublicKey)
+    println("signer: "+ signerAddress.getPublicKeyGE)
     println("metadataBytesHashed: " + metadataBytesHashed)
     println("Votes: " + votingColl)
     val ergoVal1 = ErgoValue.of(poolStateCollection, SpType.POOL_VAL_TYPE)
-    val ergoVal2 = ErgoValue.of(memberColl, SpType.MEMBER_TYPE)
-    val ergoVal3 = ErgoValue.of(signerAddress.getPublicKey)
+    val ergoVal2 = ErgoValue.of(memberColl, ErgoType.pairType(ErgoType.groupElementType(), ErgoType.collType(ErgoType.byteType())))
+    val ergoVal3 = ErgoValue.of(signerAddress.getPublicKeyGE)
     val ergoVal4 = ErgoValue.of(metadataBytesHashed, ErgoType.byteType())
     val ergoVal5 = ErgoValue.of(votingColl, ErgoType.integerType())
     val regList = List(ergoVal1, ergoVal2, ergoVal3, ergoVal4, ergoVal5)
@@ -529,14 +620,14 @@ object HoldingContract {
     val holdingBytesHashed = newColl(Blake2b256(metadataAddress.getErgoAddress.script.bytes), ErgoType.byteType())
     if(holdingBoxes.length == 1 && isRedepositBox(holdingBoxes.head)) {
       val redepositBox = holdingBoxes.head
-      val voterList = redepositBox.getRegisters.get(1).getValue.asInstanceOf[List[SigmaProp]]
+      val voterList = redepositBox.getRegisters.get(1).getValue.asInstanceOf[List[GroupElement]]
       val storedVotingValue = redepositBox.getRegisters.get(0).getValue.asInstanceOf[Long]
-      val minersToSkip = minerList.filter { (addr: Address) => !(voterList.contains(genSigProp(addr))) }
+      val minersToSkip = minerList.filter { (addr: Address) => !(voterList.contains(addr.getPublicKeyGE)) }
 
 
       minersToSkip.foreach {
         (addr: Address) =>
-          val ergoVal1 = ErgoValue.of(addr.getPublicKey)
+          val ergoVal1 = ErgoValue.of(addr.getPublicKeyGE)
           val ergoVal2 = ErgoValue.of(metadataBytesHashed, ErgoType.byteType())
           val ergoVal3 = ErgoValue.of(holdingBytesHashed, ErgoType.byteType())
           val regList = List(ergoVal1, ergoVal2, ergoVal3)
@@ -554,7 +645,7 @@ object HoldingContract {
       val votingValue = getVotingValue(totalValue, minerList.length)
       minerList.foreach {
         (addr: Address) =>
-          val ergoVal1 = ErgoValue.of(addr.getPublicKey)
+          val ergoVal1 = ErgoValue.of(addr.getPublicKeyGE)
           val ergoVal2 = ErgoValue.of(metadataBytesHashed, ErgoType.byteType())
           val ergoVal3 = ErgoValue.of(holdingBytesHashed, ErgoType.byteType())
           val regList = List(ergoVal1, ergoVal2, ergoVal3)
@@ -595,7 +686,7 @@ object HoldingContract {
     val regs = box.getRegisters
     if(regs.size() == 3) {
       val reg4 = regs.get(0).getType == ErgoType.longType()
-      val reg5 = regs.get(1).getType == ErgoType.collType(ErgoType.sigmaPropType())
+      val reg5 = regs.get(1).getType == ErgoType.collType(ErgoType.groupElementType())
       val reg6 = regs.get(2).getType == ErgoType.integerType()
       reg4 && reg5 && reg6
     }else
