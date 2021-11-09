@@ -39,4 +39,9 @@ object ShellHelper {
     print(shellState+": ")
     return scala.io.StdIn.readDouble()
   }
+
+  def shellPassword(implicit shellState: ShellState): Array[Char] = {
+    print(shellState+": ")
+    return System.console().readPassword()
+  }
 }

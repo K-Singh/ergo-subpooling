@@ -3,6 +3,7 @@
 .idea
 .bsp
 target
+data
 test_config.json
 subpool_config1.json
 subpool_config2.json

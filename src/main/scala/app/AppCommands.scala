@@ -213,6 +213,10 @@ object AppCommands {
           provingAddress = filterList(0)
         } else {
           println("The secret string provided was unable to verify you as a member of the subpool!")
+          println("These are the addresses associated with the given prover:")
+          prover.getEip3Addresses.asScala.foreach(println)
+          println("If these addresses do not look like yours")
+          println("then the mneumonic phrase you entered is wrong.")
           sys.exit(0)
         }
 
@@ -282,7 +286,7 @@ object AppCommands {
   /**
    * Command that opens up wallet access. Can create and list wallets here.
    */
-  def wallets() ={
+  def wallets(ergoClient: ErgoClient) ={
     implicit val shellState: ShellState = ShellStates.walletsState
     println("\nTo list your current wallets/signers, type \"list\". To create a new wallet/signer, type \"new\"")
     val walletCmd = shellInput
@@ -306,13 +310,29 @@ object AppCommands {
       val secretPhrase = SecretString.create(shellInput)
       println("Please enter your mneumonic password. If you are unsure of what this is, simply leave it blank and press enter.")
       val secretPhrasePass = SecretString.create(shellInput)
-      println("Please enter an encryption password to encrypt your data:")
+      println("Please enter an encryption password to encrypt your data")
       val secretPass = SecretString.create(shellInput)
       val newMneumonic = Mnemonic.create(secretPhrase, secretPhrasePass)
       println("Finally, enter the name of this wallet/signer. You can use this name to load this wallet/signer into future subpools.")
       val secretDir = shellInput
       val secStorage = SecretStorage.createFromMnemonicIn("data/"+secretDir, newMneumonic, secretPass)
       println("New wallet/signer created!")
+      ergoClient.execute(ctx =>
+        {
+          val prover: ErgoProver =
+            ctx.newProverBuilder
+              .withMnemonic(newMneumonic)
+              .withEip3Secret(0)
+              .withEip3Secret(1)
+              .withEip3Secret(2)
+              .withEip3Secret(3)
+              .withEip3Secret(4)
+              .withEip3Secret(5)
+              .build()
+          println("These are the first 5 EIP3 addresses associated with your new wallet: ")
+          prover.getEip3Addresses.asScala.foreach(println)
+        }
+      )
     }
   }
 
@@ -360,8 +380,8 @@ object AppCommands {
       sys.exit(0)
     }
     val loadedStorage = SecretStorage.loadFrom(secretFile)
-    println(s"Please enter the encryption password for wallet/signer ${secretName}")
-    val secretPass = shellInput
+    println(s"Please enter the encryption password for wallet/signer ${secretName}. The characters typed will not be shown on-screen.")
+    val secretPass = SecretString.create(shellPassword)
     try {
       loadedStorage.unlock(secretPass)
     }catch{
@@ -370,6 +390,7 @@ object AppCommands {
         sys.exit(0)
     }
     println(s"Wallet/Signer ${secretName} was successfully accessed!")
+
      loadedStorage
   }
 
@@ -390,6 +411,11 @@ object AppCommands {
       ctx.newProverBuilder
         .withSecretStorage(storedWallet)
         .withEip3Secret(0)
+        .withEip3Secret(1)
+        .withEip3Secret(2)
+        .withEip3Secret(3)
+        .withEip3Secret(4)
+        .withEip3Secret(5)
         .build()
     prover
     }

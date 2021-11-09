@@ -15,7 +15,7 @@ object SubPoolingApp {
   def main(args: Array[String]): Unit = {
 
     // Node configuration values
-    //TODO Make sure to change back to subpool_config.json
+
     var conf = ConfigBuilder.newDefaultConfig()
     try {
       conf = SubPoolConfig.load(ConfigBuilder.defaultConfigName)
@@ -50,7 +50,7 @@ object SubPoolingApp {
             println("Error: enter the name of the config file you are loading.")
           }
         case "load" => AppCommands.load(ergoClient, conf)
-        case "wallets" => AppCommands.wallets()
+        case "wallets" => AppCommands.wallets(ergoClient)
         case "help" => AppCommands.help
         case _      => println("Please enter a valid command, try \"help\" for more info.")
 
