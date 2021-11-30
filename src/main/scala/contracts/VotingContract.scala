@@ -125,6 +125,7 @@ object VotingContract {
           (memVoteList: Coll[(GroupElement, Coll[Byte])]) =>
             memVoteList.indices
         }
+        // This collection contains the size of each subcollection in nestedMemvotes.
         val sizeColl = nestedMemvotes.map{
           (memVoteList: Coll[(GroupElement, Coll[Byte])]) =>
             memVoteList.size
@@ -136,16 +137,16 @@ object VotingContract {
         // and this would represent y
         val childIndices = flatIndices.indices
 
-        // Create lower and upper bounds for indices. These bounds defined where a certain element of the parent collection
+        // Create lower and upper bounds for indices. These bounds define where a certain element of the parent collection
         // is accessed.
 
         val rangeCollUpperBound = parentIndices.map{
           (idx: Int) =>
             // Take slices of sizeColl from (0,1) (0,2) ... (0, sizeColl.size-1)
-            val sliceColl = sizeColl.slice(0, idx + 1)
-            // Fold each sizeColl slice. If we had a sizeColl containing 4,4,4 rangeCollUpperBound would contain
-            // 4,8,12
-            val foldedSlice = sliceColl.fold(0, {(accum: Int, otrIdx: Int) => accum + otrIdx})
+            val slicedColl = sizeColl.slice(0, idx + 1)
+            // Fold each sizeColl slice. If we had a sizeColl containing [4,3,4] rangeCollUpperBound would contain:
+            // [4,7,11]
+            val foldedSlice = slicedColl.fold(0, {(accum: Int, otrIdx: Int) => accum + otrIdx})
             foldedSlice
         }
 
@@ -155,23 +156,31 @@ object VotingContract {
               0
             }else{
               val newIdx = idx - 1
-              // Take slices of sizeColls from (0,1) (0,2) ... (0, sizeColl.size-1)
-              val sliceColl = sizeColl.slice(0, newIdx + 1)
-              // Fold each sizeColl slice. If we had a sizeColl containing 4,4,4 rangeCollLowerBound would contain
-              // 0,4,8
-              val foldedSlice = sliceColl.fold(0, {(accum: Int, otrIdx: Int) => accum + otrIdx})
+              // Take slices of sizeColls from (0,1) (0,2) ... (0, sizeColl.size-2). (0, sizeColl.size-1) is never accessed
+              // since the first element of this list will always be 0.
+              val slicedColl = sizeColl.slice(0, newIdx + 1)
+              // Fold each sizeColl slice. If we had a sizeColl containing [4,3,4] rangeCollLowerBound would contain:
+              // [0,4,7]
+              val foldedSlice = slicedColl.fold(0, {(accum: Int, otrIdx: Int) => accum + otrIdx})
               foldedSlice
             }
         }
         // Produces some collection of pairs representing lower and upper index of some child collection inside
         // parent collection
+        // The rangeColl from our previous example would look like this: [(0,4),(4,7),(7,11)]
         val rangeColl: Coll[(Int, Int)] = rangeCollLowerBound.zip(rangeCollUpperBound)
 
         // Creates a Coll[((Int, Int), Int)] such that if we have an example element ((0, 2), 0), (0, 2) would represent
         // the range of indices in childIndices that maps the elements with those indices to value 0
         val indexRangeMap: Coll[((Int, Int), Int)] = rangeColl.zip(parentIndices)
 
-        // convert indices from child collections into their corresponding parent indices using the indexRangeMap
+        // Convert indices from child collections into their corresponding parent indices using the indexRangeMap
+        // If we had a flatIndices that looked like this: [0,1,2,3,0,1,2,0,1,2,3]
+        // A childIndices that looked like this: [0,1,2,3,4,5,6,7,8,9,10]
+        // and parent indices like this: [0,1,2]
+        // Our indexRangeMap would let us take the two variables and create a indicesFromRangeMap like this: [0,0,0,0,1,1,1,2,2,2,2]
+        // Our indicesFromRangeMap therefore takes some child index and maps it to the index that the child collection had
+        // in the parent collection
         val indicesFromRangeMap: Coll[Int] = childIndices.map{
           (idx: Int) =>
             val rangeToIndexVal = indexRangeMap.filter{
@@ -186,7 +195,12 @@ object VotingContract {
             }
         }
         // This will create a Coll[(Int, Int)] such that each pair will represent some element of nestedMemvotes
+        // If our indicesFromRangeMap looks like this: [0,0,0,0,1,1,1,2,2,2,2]
+        // and our flatIndices looks like this: [0,1,2,3,0,1,2,0,1,2,3]
+        // originalIndices will look like this: [(0,0), (0,1), (0,2), (0,3), (1,0), (1,1) ... (2,3)]
         val originalIndices: Coll[(Int, Int)] = indicesFromRangeMap.zip(flatIndices)
+
+        // This finally flattens the collection by taking the elements
         val flattenedCollection: Coll[(GroupElement, Coll[Byte])] = originalIndices.map{
           (idxPair: (Int, Int)) =>
             nestedMemvotes(idxPair._1)(idxPair._2)

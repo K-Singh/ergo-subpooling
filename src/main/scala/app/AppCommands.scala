@@ -213,9 +213,9 @@ object AppCommands {
           provingAddress = filterList(0)
         } else {
           println("The secret string provided was unable to verify you as a member of the subpool!")
-          println("These are the addresses associated with the given prover:")
+          println("These are the addresses associated with the given prover:\n")
           prover.getEip3Addresses.asScala.foreach(println)
-          println("If these addresses do not look like yours")
+          println("\nIf these addresses do not look like yours")
           println("then the mneumonic phrase you entered is wrong.")
           sys.exit(0)
         }

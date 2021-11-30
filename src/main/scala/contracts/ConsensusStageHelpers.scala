@@ -18,10 +18,20 @@ object ConsensusStageHelpers {
     val script: String = s"""
       {
        val MinerPKs = Coll(${scriptVar})
+       val regsDefined: Boolean = {
+        (box : Box) => box.R4[Coll[(SigmaProp, Long)]].isDefined && box.R5[Long].isDefined && box.R6[SigmaProp].isDefined && box.R7[Coll[Byte]].isDefined
+        }
+       val areInputsValid = MinerPKs.forall{
+        (pk : SigmaProp) => INPUTS.exists{
+          (box: Box) =>
+            box.propositionBytes == SELF.propositionBytes && regsDefined(box) && (if(regsDefined(box)){
+                                                                                    box.R6[SigmaProp].get == pk
+                                                                                  }else{
+                                                                                    true
+                                                                                  })
+          }
+        }
 
-       val areInputsValid = INPUTS.size == MinerPKs.size && INPUTS.forall{(box : Box) => box.propositionBytes == SELF.propositionBytes}
-       val regsDefined = INPUTS.forall{(box : Box) => box.R4[Coll[(SigmaProp, Long)]].isDefined && box.R5[Long].isDefined && box.R6[SigmaProp].isDefined && box.R7[Coll[Byte]].isDefined}
-       val uniqueSignersInInputs = MinerPKs.forall{(pk: SigmaProp) => INPUTS.exists{(box : Box) => box.R6[SigmaProp].get == pk}}
        val uniqueWorkerName = INPUTS.filter{(box: Box) => box.id != SELF.id}.forall{(box: Box) => SELF.R7[Coll[Byte]].get != box.R7[Coll[Byte]].get}
 
        def buildPoolState(box: Box): Coll[(SigmaProp, Long)] = {
@@ -34,32 +44,47 @@ object ConsensusStageHelpers {
        val avgTotalShares = INPUTS.fold(0L, {(accum: Long, box: Box) => accum + box.R5[Long].get}) / (MinerPKs.size * 1L)
 
        def getBoxValue(shareNum: Long) : Long = {
-        val boxVal = ((shareNum * totalValue) / avgTotalShares) - (minFee/(MinerPKs.size * 1L))
+        val boxVal = ((shareNum * totalValue) / avgTotalShares) - ((minFee * 2 * MinerPKs.size)/(MinerPKs.size * 1L))
         boxVal
        }
 
        def buildConsensus(pk: SigmaProp) : (SigmaProp, Long) = {
         val filteredPoolState = poolStateList.map{(poolState: Coll[(SigmaProp, Long)]) => poolState.filter{(poolStateVal: (SigmaProp, Long)) => poolStateVal._1 == pk}(0)}
         val generatedAvg = (filteredPoolState.fold(0L, {(accum:Long, poolStateVal: (SigmaProp, Long)) => accum + poolStateVal._2})) / (MinerPKs.size * 1L)
-        (pk, getBoxValue(generatedAvg))
+        val boxValFromAvg = getBoxValue(generatedAvg)
+        val minerBoxVal =
+          if(boxValFromAvg < 0){
+            0L
+          }else{
+            boxValFromAvg
+          }
+
+        (pk, minerBoxVal)
         }
        val consensusPoolState = MinerPKs.map(buildConsensus)
 
-       def getSharesFromConsensus(pk: SigmaProp) : Long = {
+       def getValueFromConsensus(pk: SigmaProp) : Long = {
         val filteredConsensus = consensusPoolState.filter{(poolStateVal: (SigmaProp, Long)) => poolStateVal._1 == pk}
         filteredConsensus(0)._2
         }
 
        val doOutputsFollowConsensus = MinerPKs.forall{
-       (pk: SigmaProp) => OUTPUTS.exists{
-        (box: Box) => getSharesFromConsensus(pk) == box.value && box.propositionBytes == pk.propBytes
-          }
-        }
+       (pk: SigmaProp) =>
+         val pkConsensusValue = getValueFromConsensus(pk)
+         if(pkConsensusValue != 0){
+           OUTPUTS.exists{
+            (box: Box) =>
+              pkConsensusValue == box.value && box.propositionBytes == pk.propBytes
+            }
+         }else{
+          true
+         }
+       }
 
        val isSignerInMinerList = atLeast(1, MinerPKs)
        val areOutputsValid =  doOutputsFollowConsensus
 
-       isSignerInMinerList && sigmaProp(areInputsValid && regsDefined && uniqueSignersInInputs && areOutputsValid && uniqueWorkerName)
+       isSignerInMinerList && sigmaProp(areInputsValid && areOutputsValid && uniqueWorkerName)
        }
       """.stripMargin
     script
@@ -118,7 +143,7 @@ object ConsensusStageHelpers {
 
   def buildOutputsFromConsensus(ctx: BlockchainContext, consensusPoolState: List[(SigmaProp, Long)], minerList: List[Address], totalShares: Long, totalValue: Long): ListBuffer[OutBox] = {
 
-    val keyToBoxValue = consensusPoolState.map{(poolStateVal: (SigmaProp, Long)) => (poolStateVal._1, ((poolStateVal._2 * totalValue) / totalShares) - (Parameters.MinFee/minerList.size))}
+    val keyToBoxValue = consensusPoolState.map{(poolStateVal: (SigmaProp, Long)) => (poolStateVal._1, ((poolStateVal._2 * totalValue) / totalShares) - ((Parameters.MinFee * 2 * minerList.size)/minerList.size))}
     val addressToBoxValueList: List[(Address, Long)] = minerList.map{
       (addr: Address) => (addr, keyToBoxValue.filter{
         (poolStateVal: (SigmaProp, Long)) => poolStateVal._1 == genSigProp(addr)
@@ -128,7 +153,8 @@ object ConsensusStageHelpers {
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val outBoxList: ListBuffer[OutBox] = ListBuffer.empty[OutBox]
     addressToBoxValueList.foreach{(addrToBoxVal: (Address, Long)) =>
-      outBoxList.append(txB.outBoxBuilder().value(addrToBoxVal._2).contract(new ErgoTreeContract(addrToBoxVal._1.getErgoAddress.script)).build())
+      if(addrToBoxVal._2 > 0)
+        outBoxList.append(txB.outBoxBuilder().value(addrToBoxVal._2).contract(new ErgoTreeContract(addrToBoxVal._1.getErgoAddress.script)).build())
     }
   outBoxList
   }

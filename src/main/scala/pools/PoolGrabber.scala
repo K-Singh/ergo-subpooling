@@ -56,8 +56,8 @@ object PoolGrabber {
       if(worker.isDefined){
         worker.get.shares_good
       }else{
-        println(s"Error: Worker ${workerName} could not be found!")
-        sys.exit(0)
+        println(s"Error: Worker ${workerName} could not be found! They will be assigned 0 shares.")
+        0
       }
     }
 
