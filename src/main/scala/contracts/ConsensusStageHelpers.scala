@@ -182,9 +182,9 @@ object ConsensusStageHelpers {
       println("Consensus: " + inputBox.getRegisters.get(0).getValue.asInstanceOf[Coll[(SigmaProp, Long)]])
       println("Total Shares: " + inputBox.getRegisters.get(1).getValue.asInstanceOf[Long])
       println("Worker Name: " + new String(inputBox.getRegisters.get(3).getValue.asInstanceOf[Coll[Byte]].toArray))
+      println("Value: " + inputBox.getValue)
+      println("Id: " + inputBox.getId.toString)
       println("\n")
-    }else{
-      println("Not valid consensus box")
     }
   }
 

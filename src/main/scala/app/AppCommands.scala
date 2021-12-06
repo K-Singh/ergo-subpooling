@@ -3,8 +3,8 @@ package app
 import com.google.gson.GsonBuilder
 import configs.{ConfigBuilder, SubPoolConfig, SubPoolNodeConfig, SubPoolParameters}
 import contracts.ConsensusStageHelpers.{buildConsensusFromBoxes, buildOutputsFromConsensus, findValidInputBoxes, generateConsensusContract, getVoteRegisters}
-import contracts.HoldingStageHelpers.generateHoldingOutputRegisterList
-import contracts.{ConsensusStageHelpers, HoldingStageHelpers}
+import contracts.HoldingStageHelpers.{generateHoldingContract, generateHoldingOutputRegisterList}
+import contracts.{ConsensusStageHelpers, HoldingStageHelpers, generateContractAddress}
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoContract, ErgoProver, ErgoToken, ErgoValue, InputBox, Mnemonic, NetworkType, OutBox, Parameters, RestApiErgoClient, SecretStorage, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
 import pools.PoolGrabber.{requestFromEnigmaPool, requestFromHeroMiners}
 
@@ -151,7 +151,7 @@ object AppCommands {
       currentErgoClient = RestApiErgoClient.create(newNodeConf.getNodeApi.getApiUrl, newNodeConf.getNetworkType, newNodeConf.getNodeApi.getApiKey, explorerUrl)
       println(s"Config file ${configPath} has been loaded.")
     }
-    println("\nEnter \"withdraw\", \"distribute\" or \"join\". Enter \"back\" to return to main menu.")
+    println("\nEnter \"withdraw\", \"distribute\", \"join\", or \"view\". Enter \"back\" to return to main menu.")
     Iterator.continually(shellInput)
       .takeWhile(_ != "back")
       .foreach{ str:String =>
@@ -292,9 +292,33 @@ object AppCommands {
   def view(ergoClient: ErgoClient, config: SubPoolConfig) = {
     implicit val shellState: ShellState = ShellStates.loadState
     ergoClient.execute(ctx => {
-      val holdingAddress = Address.create(config.getParameters.getHoldingAddress)
+      println("These are the addresses your config file should hold: \n")
+      val addressList = config.getParameters.getMinerAddressList.map(x => Address.create(x))
+      val consensusContract = generateConsensusContract(ctx, addressList.toList, (config.getParameters.getMinimumPayout * Parameters.OneErg).toLong)
+      val consensusAddress = generateContractAddress(consensusContract, config.getNode.getNetworkType)
+      val holdingContract = generateHoldingContract(ctx, addressList.toList, (config.getParameters.getMinimumPayout * Parameters.OneErg).toLong, consensusAddress)
+      val holdingAddress = generateContractAddress(holdingContract, config.getNode.getNetworkType)
+      println("Holding Address: " + holdingAddress)
+      println("Consensus Address: " + consensusAddress)
+      println("\nThese are the addresses currently stored in your config file: ")
+      val holdingAddressStored = Address.create(config.getParameters.getHoldingAddress)
+      val consensusAddressStored = Address.create(config.getParameters.getConsensusAddress)
+      println("Stored Holding Address: " + holdingAddressStored)
+      println("Stored Consensus Address: " + consensusAddressStored)
+
+      if(!holdingAddressStored.toString.equals(holdingAddress.toString)){
+        println("The holding addresses are not equal!")
+      }else{
+        println("The holding addresses are equal. Your subpool address is up-to date.")
+      }
+      if(!consensusAddressStored.toString.equals(consensusAddressStored.toString)){
+        println("The consensus addresses are not equal!")
+      }else{
+        println("The consensus addresses are equal. Your subpool address is up-to date.")
+      }
+
       val boxes = ctx.getUnspentBoxesFor(holdingAddress, 0, 50)
-      println("These are the current votes at the consensus address: \n")
+      println("\nThese are the current votes at the current stored consensus address: \n")
       boxes.forEach(getVoteRegisters)
     })
   }
