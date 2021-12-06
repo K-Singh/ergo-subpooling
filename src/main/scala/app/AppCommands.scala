@@ -2,7 +2,7 @@ package app
 
 import com.google.gson.GsonBuilder
 import configs.{ConfigBuilder, SubPoolConfig, SubPoolNodeConfig, SubPoolParameters}
-import contracts.ConsensusStageHelpers.{buildConsensusFromBoxes, buildOutputsFromConsensus, findValidInputBoxes, generateConsensusContract}
+import contracts.ConsensusStageHelpers.{buildConsensusFromBoxes, buildOutputsFromConsensus, findValidInputBoxes, generateConsensusContract, getVoteRegisters}
 import contracts.HoldingStageHelpers.generateHoldingOutputRegisterList
 import contracts.{ConsensusStageHelpers, HoldingStageHelpers}
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoContract, ErgoProver, ErgoToken, ErgoValue, InputBox, Mnemonic, NetworkType, OutBox, Parameters, RestApiErgoClient, SecretStorage, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
@@ -41,6 +41,7 @@ object AppCommands {
     println("------distribute   - Sign transaction from consensus stage and distribute rewards to members. All members must have sent a")
     println("                     withdrawal request in order for this to work")
     println("------join         - Join the loaded subpool. This will replace the wallet-name and worker-name with new valid inputs.")
+    println("------view         - View the current votes sent to this subpool's consensus address")
     println("wallets            - Load wallet/signer commands")
     println("------list         - List current saved wallets/signers")
     println("------new          - Create a new wallet/signer from a mneumonic. You can restore wallets from other ")
@@ -166,6 +167,7 @@ object AppCommands {
               println(" StackTrace: " + err.printStackTrace())
           }
           case "join" => join(currentConfig, configPath)
+          case "view" => view(currentErgoClient, currentConfig)
           case "exit" => sys.exit(0)
           case _: String =>
         }
@@ -261,6 +263,10 @@ object AppCommands {
       val consensusBoxList = ctx.getUnspentBoxesFor(consensusAddress, 0, 20)
       val consensusInputBoxes = findValidInputBoxes(ctx, minerAddressList.toList, consensusBoxList.asScala.toList)
 
+      println("Here are the consensus boxes used in this transaction: \n")
+      consensusInputBoxes.foreach(getVoteRegisters)
+
+
 
       val totalValue: Long = consensusInputBoxes.foldLeft(0L) { (accum: Long, box: InputBox) => accum + box.getValue }
       val avgTotalShares: Long = consensusInputBoxes.foldLeft(0L) { (accum: Long, box: InputBox) => accum + box.getRegisters.get(1).getValue.asInstanceOf[Long] } / (consensusInputBoxes.size * 1L)
@@ -280,6 +286,16 @@ object AppCommands {
       val signed: SignedTransaction = prover.sign(tx)
       val txId: String = ctx.sendTransaction(signed)
       println(s"\nYour distribution transaction was successful! Your transaction id is: ${txId}")
+    })
+  }
+
+  def view(ergoClient: ErgoClient, config: SubPoolConfig) = {
+    implicit val shellState: ShellState = ShellStates.loadState
+    ergoClient.execute(ctx => {
+      val holdingAddress = Address.create(config.getParameters.getHoldingAddress)
+      val boxes = ctx.getUnspentBoxesFor(holdingAddress, 0, 50)
+      println("These are the current votes at the consensus address: \n")
+      boxes.forEach(getVoteRegisters)
     })
   }
 

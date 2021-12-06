@@ -9,6 +9,7 @@ import sigmastate.basics.DLogProtocol.ProveDlog
 import special.collection.Coll
 import special.sigma.{BoxRType, SigmaProp}
 
+import java.nio.charset.StandardCharsets
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 import scala.collection.mutable.ListBuffer
 
@@ -149,6 +150,10 @@ object ConsensusStageHelpers {
         (poolStateVal: (SigmaProp, Long)) => poolStateVal._1 == genSigProp(addr)
       }.head._2)
     }
+    println("Each address in the subpool will get this many nanoERG: ")
+    addressToBoxValueList.foreach(x => println(x._1 + " : " + x._2 + "\n"))
+
+    println("If one of the above values is below 0, then the address will get 0 ERG.\n")
     //println(addressToBoxValueList)
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val outBoxList: ListBuffer[OutBox] = ListBuffer.empty[OutBox]
@@ -160,8 +165,26 @@ object ConsensusStageHelpers {
   }
 
   def findValidInputBoxes(ctx: BlockchainContext, minerList: List[Address], inputBoxes:List[InputBox]): List[InputBox] = {
+    inputBoxes.foreach(getVoteRegisters)
     minerList.map{(addr: Address) => inputBoxes.filter {
-      (box: InputBox) => genSigProp(addr) == box.getRegisters.get(2).getValue.asInstanceOf[SigmaProp]}.head
+      (box: InputBox) =>
+        if (box.getRegisters.size() == 4)
+          genSigProp(addr) == box.getRegisters.get(2).getValue.asInstanceOf[SigmaProp]
+        else
+          false
+    }.head
+    }
+  }
+
+  def getVoteRegisters(inputBox: InputBox) = {
+    if(inputBox.getRegisters.size() == 4){
+      println("======= Signer: " + inputBox.getRegisters.get(2).getValue.asInstanceOf[SigmaProp] + " =======")
+      println("Consensus: " + inputBox.getRegisters.get(0).getValue.asInstanceOf[Coll[(SigmaProp, Long)]])
+      println("Total Shares: " + inputBox.getRegisters.get(1).getValue.asInstanceOf[Long])
+      println("Worker Name: " + new String(inputBox.getRegisters.get(3).getValue.asInstanceOf[Coll[Byte]].toArray))
+      println("\n")
+    }else{
+      println("Not valid consensus box")
     }
   }
 

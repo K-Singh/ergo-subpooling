@@ -1,6 +1,6 @@
 package test
 
-import contracts.ConsensusStageHelpers.{buildConsensusFromBoxes, buildOutputsFromConsensus, findValidInputBoxes, generateConsensusContract, getConsensusScript}
+import contracts.ConsensusStageHelpers.{buildConsensusFromBoxes, buildOutputsFromConsensus, findValidInputBoxes, generateConsensusContract, getConsensusScript, getVoteRegisters}
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.appkit.JavaHelpers.SigmaDsl
 import org.ergoplatform.appkit.{ErgoType, _}
@@ -111,14 +111,14 @@ object SubPool_Test_2_Miners {
     val txB2: UnsignedTransactionBuilder = ctx.newTxBuilder
 
     val tokenList = List.empty[ErgoToken].asJava
-    val holdingBoxList: java.util.List[InputBox] = ctx.getCoveringBoxesFor(holdingAddress, consensusValue + Parameters.MinFee, tokenList).getBoxes
+    val holdingBoxList: java.util.List[InputBox] = ctx.getUnspentBoxesFor(holdingAddress, 0, 1)
     holdingBoxList.forEach({(box:InputBox) => println(box.toJson(true))})
 
     //Sample values
-    val sampleShareList1 = List(200L, 100L)
-    val sampleShareList2 = List(300L, 130L)
-    val registerList1 = generateHoldingOutputRegisterList(minerAddressList, sampleShareList1, 300L, miner1Address, workerName1)
-    val registerList2 = generateHoldingOutputRegisterList(minerAddressList, sampleShareList2, 430L, miner2Address, workerName2)
+    val sampleShareList1 = List(0L, 100L)
+    val sampleShareList2 = List(0L, 130L)
+    val registerList1 = generateHoldingOutputRegisterList(minerAddressList, sampleShareList1, 100L, miner1Address, workerName1)
+    val registerList2 = generateHoldingOutputRegisterList(minerAddressList, sampleShareList2, 130L, miner2Address, workerName2)
 
     val holdingOutBox1: OutBox = txB.outBoxBuilder
       .value(amountToSend)
@@ -150,9 +150,11 @@ object SubPool_Test_2_Miners {
 
     txB.getInputBoxes.forEach(x => System.out.println("Hi! \n" + x.toJson(true)))
     // Sign transaction of mining pool to holding box
-    //val signed: SignedTransaction = miner1Prover.sign(tx)
-    val signed: SignedTransaction = miner2Prover.sign(tx2)
+    val signed: SignedTransaction = miner1Prover.sign(tx)
+    //val signed: SignedTransaction = miner2Prover.sign(tx2)
+
     // Submit transaction to node
+
     val txId: String = ctx.sendTransaction(signed)
 
     // Return transaction as JSON string
@@ -178,7 +180,7 @@ object SubPool_Test_2_Miners {
     val consensusInputBoxes = findValidInputBoxes(ctx, minerAddressList, consensusBoxList.asScala.toList)
 
     consensusInputBoxes.foreach((box: InputBox) => println(box.toJson(true)))
-
+    consensusInputBoxes.foreach(getVoteRegisters)
     val totalValue: Long = consensusInputBoxes.foldLeft(0L){(accum:Long, box: InputBox) => accum + box.getValue}
     val avgTotalShares : Long = consensusInputBoxes.foldLeft(0L){(accum : Long, box: InputBox) => accum + box.getRegisters.get(1).getValue.asInstanceOf[Long]} / (consensusInputBoxes.size * 1L)
     val minerPKs =  minerAddressList.map(contracts.genSigProp)
@@ -222,9 +224,9 @@ object SubPool_Test_2_Miners {
 
     // Execute transaction
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
-      miningPoolToHoldingBoxTx(ctx, miningPoolString, miner1String, miner2String)
+      //miningPoolToHoldingBoxTx(ctx, miningPoolString, miner1String, miner2String)
       //holdingBoxToConsensusTx(ctx, miner1String, miner2String)
-      //consensusToMinersTx(ctx, miner1String, miner2String)
+      consensusToMinersTx(ctx, miner1String, miner2String)
     })
       //val txJson: String = sendTx("subpool_config.json")
       System.out.println(txJson)

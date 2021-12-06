@@ -7,6 +7,8 @@ import sigmastate.basics.DLogProtocol.ProveDlog
 import special.collection.Coll
 import special.sigma.SigmaProp
 
+import java.nio.charset.StandardCharsets
+
 object HoldingStageHelpers {
 
   def getHoldingScript(scriptVar: String): String = {
@@ -29,7 +31,7 @@ object HoldingStageHelpers {
 
        val doesOutputReDeposit = OUTPUTS.size == 3 && OUTPUTS.exists{(box: Box) => box.propositionBytes == SELF.propositionBytes}
        val isSignerInMinerList = atLeast(1, MinerPKs)
-       val isOutput1ValueValid = OUTPUTS(0).value == (sentConsensusValue - minFee) && OUTPUTS(0).propositionBytes == consensusBytes
+       val isOutput1ValueValid = OUTPUTS(0).propositionBytes == consensusBytes
        val isRedepositNeeded = if(SELF.value >= sentConsensusValue*2){doesOutputReDeposit}else{true}
 
        (isSignerInMinerList && isSignatureValid && (sigmaProp(isPoolStateValid && isTotalSharesValid && isRedepositNeeded)))
@@ -58,7 +60,7 @@ object HoldingStageHelpers {
     val compiledContract = ctx.compileContract(constantsBuilder
       .item("sentConsensusValue", consensusVal)
       .item("minFee", Parameters.MinFee)
-      .item("consensusPropBytes", consensusAddress.getErgoAddress.contentBytes)
+      .item("consensusPropBytes", consensusAddress.getErgoAddress.script.bytes)
       .build(), getHoldingScript(scriptVarString))
     compiledContract
   }
@@ -69,11 +71,18 @@ object HoldingStageHelpers {
     val keysToSharesTupleMap: List[(SigmaProp,Long)] = sigList.zip(minerShares)
     val poolStateCollection: Coll[(SigmaProp, Long)] = special.collection.Builder.DefaultCollBuilder
       .fromItems(keysToSharesTupleMap: _*)(RType.pairRType(special.sigma.SigmaPropRType, RType.LongType))
-
+    println("This is the vote you are submitting to the consensus address: ")
+    println("======= Unconfirmed Vote =======")
+    println("Signer Address: " + signerAddress)
+    println("Signer Public Key: " + signerAddress.getPublicKey.value)
+    println("Consensus: " + poolStateCollection)
+    println("Total Shares: " + totalShares)
+    println("Worker Name: " + workerName)
+    println("\n")
     val ergoVal1 = ErgoValue.of[(SigmaProp, Long)](poolStateCollection, ErgoType.pairType[SigmaProp, Long](ErgoType.sigmaPropType(), ErgoType.longType()))
     val ergoVal2 = ErgoValue.of(totalShares)
     val ergoVal3 = ErgoValue.of(signerAddress.getPublicKey)
-    val ergoVal4 = ErgoValue.of(Blake2b256(workerName))
+    val ergoVal4 = ErgoValue.of(workerName.getBytes(StandardCharsets.UTF_8))
     List(ergoVal1, ergoVal2, ergoVal3, ergoVal4)
   }
 
